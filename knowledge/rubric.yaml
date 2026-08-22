@@ -1,0 +1,64 @@
+# ---------------------------------------------------------------------------
+# SCORING RUBRIC  (box "D" -> Scoring Rubric; box "6" -> Scores per Category)
+#
+# Category scores are 0-10. `weight` values are normalised automatically, so
+# they do not need to sum to 1.0. Overall score is reported out of 100.
+# ---------------------------------------------------------------------------
+
+scale:
+  min: 0
+  max: 10
+
+categories:
+  - key: communication
+    label: Communication
+    weight: 0.30
+    description: >-
+      Clarity of spoken English, structure of answers, listening (answers the
+      question actually asked), professional tone.
+    anchors:
+      "0-2": "Very hard to follow; frequent breakdowns in comprehension."
+      "3-4": "Understandable but rambling or repeatedly off-question."
+      "5-6": "Clear enough for internal work; some structure issues."
+      "7-8": "Clear, structured, comfortable — client-ready with light coaching."
+      "9-10": "Excellent: concise, structured, confident, fully client-ready."
+
+  - key: experience
+    label: Experience
+    weight: 0.45
+    description: >-
+      Depth and relevance of prior work, specificity of examples, evidence of
+      ownership and results, familiarity with the tools the role needs.
+    anchors:
+      "0-2": "No relevant experience; cannot describe past work concretely."
+      "3-4": "Adjacent experience only; answers stay generic."
+      "5-6": "Some relevant experience with at least one concrete example."
+      "7-8": "Solid relevant experience; specific examples with outcomes."
+      "9-10": "Directly transferable senior-level experience with measurable results."
+
+  - key: availability
+    label: Availability & Setup
+    weight: 0.25
+    description: >-
+      Working hours and timezone overlap, start date, equipment and internet
+      reliability, and whether stated compensation fits the band.
+    anchors:
+      "0-2": "Cannot meet the required hours or has no workable setup."
+      "3-4": "Significant gaps in hours, equipment or internet."
+      "5-6": "Workable with caveats (e.g. partial overlap, no backup internet)."
+      "7-8": "Meets requirements with a reliable setup."
+      "9-10": "Full overlap, immediate start, redundant internet and power."
+
+# Overall score is out of 100. First matching band wins, evaluated top-down.
+recommendation_thresholds:
+  - recommendation: PROCEED
+    min_overall: 75
+    # Every listed category must also clear its own floor.
+    min_category:
+      communication: 6
+      experience: 6
+      availability: 6
+  - recommendation: REVIEW
+    min_overall: 55
+  - recommendation: DO_NOT_PROCEED
+    min_overall: 0

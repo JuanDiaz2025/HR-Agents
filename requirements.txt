@@ -1,0 +1,25 @@
+# --- core web app ---
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic[email]>=2.7
+pydantic-settings>=2.3
+python-multipart>=0.0.9
+
+# --- persistence ---
+SQLAlchemy>=2.0
+alembic>=1.13          # optional: only if you outgrow create_all()
+psycopg[binary]>=3.1   # optional: only needed for Postgres
+
+# --- outbound HTTP ---
+httpx>=0.27
+
+# --- AI brain ---
+anthropic>=1.0
+
+# --- knowledge files ---
+PyYAML>=6.0
+
+# --- Google Calendar / Sheets ---
+google-api-python-client>=2.130
+google-auth>=2.30
+google-auth-httplib2>=0.2

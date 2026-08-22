@@ -1,0 +1,112 @@
+# ---------------------------------------------------------------------------
+# QUESTION BANK  (box "D. Knowledge & Logic" -> Question Bank + Follow-up Logic)
+#
+# One block per role. `default` is used when a candidate's role_applied has no
+# dedicated block. Edit freely — nothing in the code hardcodes these.
+#
+# Fields per question:
+#   id            stable identifier (used in transcripts + scorecards)
+#   category      must match a category key in rubric.yaml
+#   text          what the AI asks, verbatim
+#   required      if true the AI always asks it (never skipped for time)
+#   max_followups override the global cap for this question
+#   probe_for     hints the AI uses when deciding whether to follow up
+#   ask_if        optional condition on facts gathered so far, e.g.
+#                 "has_experience == true"
+# ---------------------------------------------------------------------------
+
+roles:
+  default:
+    opening: >-
+      Hi {first_name}, thanks for joining. I'm the AI interviewer for
+      {company}. This is a short screening conversation, about
+      {duration} minutes, and it's recorded so the hiring team can review it.
+      I'll ask a few questions about your background, your setup and your
+      availability. Please answer out loud and take your time. Ready to start?
+    closing: >-
+      That's everything I needed, {first_name}. Thank you for your time. The
+      hiring team will review this conversation and get back to you by email.
+      Have a great day.
+    questions:
+      - id: intro
+        category: communication
+        text: "To start, tell me a little about yourself and what kind of work you're looking for."
+        required: true
+        probe_for: ["clarity of communication", "relevance to the role"]
+
+      - id: experience_summary
+        category: experience
+        text: "Walk me through your most recent role — what did you do day to day, and for how long?"
+        required: true
+        probe_for: ["length of tenure", "concrete responsibilities", "tools used"]
+
+      - id: relevant_example
+        category: experience
+        text: >-
+          Give me one specific example of a problem you solved in that role, and
+          what the outcome was.
+        required: true
+        probe_for: ["specificity", "ownership", "measurable outcome"]
+
+      - id: tools
+        category: experience
+        text: "Which software or tools are you comfortable working in every day?"
+        required: false
+        probe_for: ["named tools", "depth vs. surface familiarity"]
+
+      - id: availability_hours
+        category: availability
+        text: >-
+          What hours can you reliably work, and are you able to overlap with a
+          US Pacific-time team?
+        required: true
+        probe_for: ["specific hours", "timezone overlap", "other commitments"]
+
+      - id: start_date
+        category: availability
+        text: "If we moved forward, how soon could you start?"
+        required: true
+        probe_for: ["concrete date or notice period"]
+
+      - id: work_setup
+        category: availability
+        text: >-
+          Tell me about your work setup at home — your computer, your internet
+          connection, and whether you have a quiet place to take calls.
+        required: true
+        probe_for: ["own device", "internet speed and stability", "backup power/internet", "noise"]
+
+      - id: compensation
+        category: availability
+        text: "What monthly rate are you looking for, in US dollars?"
+        required: true
+        probe_for: ["a specific number or range"]
+
+      - id: candidate_questions
+        category: communication
+        text: "Before we finish — is there anything you'd like to ask about the role?"
+        required: false
+        probe_for: ["engagement", "preparation"]
+
+  # Example of a role-specific bank. Copy this block and rename the key to add
+  # more roles; anything omitted falls back to `default`.
+  virtual_assistant:
+    inherits: default
+    extra_questions:
+      - id: va_admin_tools
+        category: experience
+        text: >-
+          Have you used a CRM or project tool like Monday.com, Trello or
+          Airtable? Describe how you used it.
+        required: true
+        probe_for: ["named tool", "actual workflow, not just awareness"]
+        after: tools
+
+      - id: va_written_english
+        category: communication
+        text: >-
+          A big part of this job is writing emails to US clients. How would you
+          rate your written English, and what do you do to keep it professional?
+        required: true
+        probe_for: ["self-awareness", "concrete habits"]
+        after: intro

@@ -1,0 +1,107 @@
+# ---------------------------------------------------------------------------
+# COMPANY POLICIES, JOB REQUIREMENTS AND DISQUALIFICATION RULES
+# (box "D" -> Disqualification Rules / Company Policies / Job Requirements)
+# ---------------------------------------------------------------------------
+
+company:
+  name: EquityTrack PH
+  what_we_do: >-
+    A US-based real-estate investment operation with a remote team in the
+    Philippines. Roles are fully remote and support US-based clients.
+  interviewer_persona: >-
+    Warm, efficient and professional. You are transparent about being an AI
+    screening interviewer. You never promise a job offer, never negotiate
+    compensation, and never discuss other candidates.
+
+# Facts the AI extracts from the conversation. Types: bool | number | string.
+# The disqualification rules below are evaluated against these deterministically,
+# so the LLM never decides on its own to reject someone.
+facts:
+  - key: has_own_computer
+    type: bool
+    description: "Candidate has their own working computer/laptop for the job."
+  - key: internet_mbps
+    type: number
+    description: "Stated download speed in Mbps. Null if not stated."
+  - key: has_backup_internet
+    type: bool
+    description: "Has a backup connection (mobile data, second ISP) or backup power."
+  - key: quiet_workspace
+    type: bool
+    description: "Has a quiet place to take client calls."
+  - key: weekly_hours_available
+    type: number
+    description: "Hours per week the candidate can commit."
+  - key: can_overlap_us_pacific
+    type: bool
+    description: "Can work hours that overlap the US Pacific-time workday."
+  - key: earliest_start_days
+    type: number
+    description: "Days until they can start. 0 means immediately."
+  - key: expected_monthly_usd
+    type: number
+    description: "Expected monthly compensation in USD. Null if not stated."
+  - key: years_relevant_experience
+    type: number
+    description: "Years of experience relevant to the role applied for."
+  - key: currently_employed_elsewhere_fulltime
+    type: bool
+    description: "Currently holds another full-time job they intend to keep."
+
+# Hard requirements. Any rule that trips forces DO_NOT_PROCEED regardless of
+# scores. `op` is one of: is_true, is_false, gte, lte, gt, lt, eq, ne.
+# A rule whose fact is null (never established) is skipped unless
+# `null_fails: true`.
+disqualification_rules:
+  - id: no_computer
+    fact: has_own_computer
+    op: is_true
+    message: "Does not have their own computer — the role requires one."
+  - id: no_quiet_workspace
+    fact: quiet_workspace
+    op: is_true
+    message: "No quiet workspace for client calls."
+  - id: slow_internet
+    fact: internet_mbps
+    op: gte
+    value: 15
+    message: "Internet speed below the 15 Mbps minimum."
+  - id: insufficient_hours
+    fact: weekly_hours_available
+    op: gte
+    value: 30
+    message: "Cannot commit the 30 hours per week minimum."
+  - id: no_us_overlap
+    fact: can_overlap_us_pacific
+    op: is_true
+    message: "Cannot overlap US Pacific working hours."
+  - id: over_budget
+    fact: expected_monthly_usd
+    op: lte
+    value: 1500
+    message: "Expected compensation exceeds the approved band (USD 1,500/month)."
+
+# Blockers the AI may confirm mid-interview and then wrap up early and politely
+# rather than burning the full 30 minutes. Referenced by rule id above.
+early_exit_rules: [no_computer, no_us_overlap, insufficient_hours]
+
+# Verbatim answers for questions the AI is allowed to answer if the candidate
+# asks. Anything not listed here gets deferred to the human hiring team.
+faq:
+  - q: "Is this role fully remote?"
+    a: "Yes — the role is fully remote and you would work from home."
+  - q: "How is payment handled?"
+    a: >-
+      Contractors are paid twice a month by bank transfer or Wise. The hiring
+      team will walk you through the details if you move forward.
+  - q: "What are the next steps?"
+    a: >-
+      The hiring team reviews this conversation and reaches out by email,
+      usually within a few business days.
+
+guardrails:
+  - "Never state or imply that the candidate has or has not got the job."
+  - "Never negotiate or confirm a salary figure — only record what they ask for."
+  - "Do not ask about age, marital status, religion, pregnancy, health or any other protected characteristic."
+  - "If the candidate asks something not covered by the FAQ, say the hiring team will follow up."
+  - "If the candidate becomes distressed or abusive, close the interview politely and end the call."
