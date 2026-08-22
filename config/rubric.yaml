@@ -1,0 +1,81 @@
+# Evaluation rubric. Edit this file to change how videos are scored — no code
+# changes required. Weights must sum to 100.
+
+version: 1
+name: "Default video screening rubric"
+
+decision:
+  pass_threshold: 75        # weighted score >= this  -> PASS
+  review_threshold: 70      # confidence < this       -> NEEDS REVIEW (no auto-decision)
+  auto_fail_on_compliance: true   # any criterion with compliance:true scoring 0 -> NOT PASS
+
+criteria:
+  - id: clarity
+    name: "Clarity"
+    weight: 20
+    description: >
+      Speech is intelligible and well paced. Ideas are organized and easy to
+      follow. Audio and video quality are good enough to assess the response.
+    scoring:
+      0:  "Largely unintelligible, or audio/video unusable."
+      50: "Understandable but rambling, rushed, or hard to follow in places."
+      100: "Clear, well paced, and easy to follow throughout."
+
+  - id: completeness
+    name: "Completeness"
+    weight: 25
+    description: >
+      Every question or prompt the applicant was asked is addressed with enough
+      substance to judge.
+    scoring:
+      0:  "Most prompts unaddressed."
+      50: "Some prompts addressed, others skipped or answered superficially."
+      100: "All prompts addressed with substance."
+
+  - id: accuracy
+    name: "Accuracy"
+    weight: 25
+    description: >
+      Claims are internally consistent and consistent with the form responses.
+      No statements that contradict the submitted application.
+    scoring:
+      0:  "Clear contradictions with the form, or plainly false claims."
+      50: "Minor inconsistencies or unverifiable claims."
+      100: "Consistent with the form and internally coherent."
+
+  - id: compliance
+    name: "Compliance"
+    weight: 15
+    compliance: true
+    description: >
+      Required disclosures/statements are present, and the submission follows the
+      stated rules (length, format, no prohibited content).
+    scoring:
+      0:  "Required element missing or a rule was broken."
+      50: "Present but incomplete."
+      100: "Fully compliant."
+
+  - id: behavior_tone
+    name: "Behavior / Tone"
+    weight: 15
+    description: >
+      Professional, respectful, appropriately engaged for the context.
+    scoring:
+      0:  "Unprofessional or inappropriate."
+      50: "Acceptable but flat, distracted, or inconsistent."
+      100: "Professional and appropriately engaged."
+
+# Add your own criteria here. Any criterion added to this list is automatically
+# scored and included in the weighted total — remember to rebalance weights.
+
+# Things the evaluator must NOT consider, at any point, for any criterion.
+prohibited_factors:
+  - "Race, ethnicity, skin tone, or national origin"
+  - "Sex, gender identity, or gender expression"
+  - "Age or apparent age"
+  - "Disability, health conditions, or medical appearance"
+  - "Religion or religious dress"
+  - "Pregnancy or family status"
+  - "Physical attractiveness, body type, or grooming beyond stated requirements"
+  - "Accent or dialect, except where it genuinely prevents comprehension"
+  - "Home environment, background, or apparent socioeconomic status"

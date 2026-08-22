@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VideoEvaluationResult",
+  "description": "Structured output the model must return for a single video submission. The model scores criteria; application code computes the weighted total and applies the pass threshold.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["submission_id", "rubric_version", "criteria", "confidence", "summary"],
+  "properties": {
+    "submission_id": { "type": "string" },
+    "rubric_version": { "type": "integer" },
+    "criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "score", "rationale", "evidence"],
+        "properties": {
+          "id": { "type": "string", "description": "Must match a criterion id in rubric.yaml" },
+          "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "rationale": { "type": "string", "maxLength": 500 },
+          "evidence": {
+            "type": "array",
+            "description": "Direct quotes or timestamped observations supporting the score.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["timestamp", "observation"],
+              "properties": {
+                "timestamp": { "type": "string", "pattern": "^[0-9]{1,2}:[0-9]{2}(:[0-9]{2})?$" },
+                "observation": { "type": "string", "maxLength": 300 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "confidence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "How confident the model is in its scoring. Low when audio is poor, the video is truncated, or the rubric is hard to apply to what was submitted."
+    },
+    "confidence_reason": { "type": "string", "maxLength": 300 },
+    "summary": { "type": "string", "maxLength": 600 },
+    "strengths": { "type": "array", "maxItems": 5, "items": { "type": "string", "maxLength": 200 } },
+    "areas_to_improve": { "type": "array", "maxItems": 5, "items": { "type": "string", "maxLength": 200 } },
+    "flags": {
+      "type": "array",
+      "description": "Conditions requiring human attention regardless of score.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "unintelligible_audio",
+          "video_truncated",
+          "wrong_person_or_topic",
+          "possible_ai_generated",
+          "prohibited_content",
+          "missing_required_disclosure",
+          "duplicate_submission",
+          "technical_error"
+        ]
+      }
+    }
+  }
+}
