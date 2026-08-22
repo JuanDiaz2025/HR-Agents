@@ -1,0 +1,18 @@
+<form action="/submissions/{{ submission.submission_id }}/review" method="post">
+  <div class="field">
+    <label for="decision">Decision</label>
+    <select id="decision" name="decision" required>
+      <option value="PASS">Pass</option>
+      <option value="NOT PASS">Not pass</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="reviewer">Your name or email</label>
+    <input id="reviewer" name="reviewer" type="text" required>
+  </div>
+  <div class="field">
+    <label for="notes">Notes — required when you disagree with the AI</label>
+    <textarea id="notes" name="notes" style="min-height:70px"></textarea>
+  </div>
+  <button class="primary" type="submit">Record decision</button>
+</form>

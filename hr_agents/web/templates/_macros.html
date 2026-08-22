@@ -1,0 +1,23 @@
+{% macro decision_pill(decision) %}
+  {%- if decision == 'PASS' -%}
+    <span class="pill pass"><span class="glyph" aria-hidden="true">✓</span>Pass</span>
+  {%- elif decision == 'NOT PASS' -%}
+    <span class="pill notpass"><span class="glyph" aria-hidden="true">✕</span>Not pass</span>
+  {%- elif decision == 'NEEDS REVIEW' -%}
+    <span class="pill review"><span class="glyph" aria-hidden="true">!</span>Needs review</span>
+  {%- else -%}
+    <span class="pill none"><span class="glyph" aria-hidden="true">–</span>Not evaluated</span>
+  {%- endif -%}
+{% endmacro %}
+
+{% macro status_pill(status) %}
+  {%- if status == 'ERROR' -%}
+    <span class="pill error"><span class="glyph" aria-hidden="true">!</span>Error</span>
+  {%- elif status == 'DONE' -%}
+    <span class="pill pass"><span class="glyph" aria-hidden="true">✓</span>Evaluated</span>
+  {%- elif status == 'PROCESSING' -%}
+    <span class="pill review"><span class="glyph" aria-hidden="true">…</span>Processing</span>
+  {%- else -%}
+    <span class="pill none"><span class="glyph" aria-hidden="true">–</span>Pending</span>
+  {%- endif -%}
+{% endmacro %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% set page = 'submit' %}
+{% block title %}New submission · HR-Agents{% endblock %}
+
+{% block content %}
+<h1>New submission</h1>
+<p class="lede">
+  Stands in for the applicant-facing form so you can run the pipeline end to end.
+  In production these rows arrive from your real form.
+</p>
+
+<div class="card" style="max-width:620px">
+  <form action="/submit" method="post" enctype="multipart/form-data">
+    <div class="field">
+      <label for="name">Name</label>
+      <input id="name" name="name" type="text" required>
+    </div>
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email">
+    </div>
+    <div class="field">
+      <label for="role">Role applied for</label>
+      <input id="role" name="role" type="text">
+    </div>
+    <div class="field">
+      <label for="answers">Written answers</label>
+      <textarea id="answers" name="answers"
+        placeholder="What they wrote on the form. The evaluator checks the video against this for consistency."></textarea>
+    </div>
+    <div class="field">
+      <label for="video">Video file</label>
+      <input id="video" name="video" type="file" accept="video/*" required>
+    </div>
+    <div class="actions">
+      <button class="primary" type="submit">Add submission</button>
+      <span style="font-size:0.8rem;color:var(--muted)">
+        Queued as pending — evaluate it from the dashboard.
+      </span>
+    </div>
+  </form>
+</div>
+{% endblock %}

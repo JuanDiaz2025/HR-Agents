@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% from "_macros.html" import decision_pill, status_pill %}
+{% set page = 'submissions' %}
+{% block title %}{{ submission.name }} · HR-Agents{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:4px">
+  <h1 style="margin:0">{{ submission.name }}</h1>
+  {{ decision_pill(submission.final_decision) }}
+  {{ status_pill(submission.status) }}
+</div>
+<p class="lede">
+  {{ submission.submission_id }}{% if submission.email %} · {{ submission.email }}{% endif %}
+  {% if submission.get('Evaluated At') %} · evaluated {{ submission.get('Evaluated At') }}{% endif %}
+</p>
+
+{% if submission.status == 'ERROR' %}
+  <div class="banner" style="border-color:var(--serious)">
+    <strong>Evaluation failed.</strong> {{ submission.get('Error') }}
+  </div>
+{% endif %}
+
+<div class="grid split">
+  <div class="stack">
+    <div class="card">
+      <h2>Video</h2>
+      {% if video_url %}
+        <video class="video-frame" controls preload="metadata" src="{{ video_url }}"></video>
+      {% else %}
+        <p class="empty-state">
+          No playable video. The link is
+          {% if submission.video_link %}<code>{{ submission.video_link }}</code>{% else %}empty{% endif %} —
+          only uploads and direct http(s) links play in the browser.
+        </p>
+      {% endif %}
+    </div>
+
+    {% if submission.criterion_scores() %}
+      <div class="card">
+        <h2>Criterion scores</h2>
+        {% for scored in submission.criterion_scores() %}
+          {% set criterion = criteria.get(scored.id) %}
+          <div class="criterion">
+            <header>
+              <span class="name">{{ criterion.name if criterion else scored.id }}</span>
+              {% if criterion %}<span class="weight">weight {{ criterion.weight }}</span>{% endif %}
+              <span class="score">{{ scored.score }}</span>
+            </header>
+            <div class="meter"><span style="width: {{ scored.score }}%"></span></div>
+            <p class="rationale">{{ scored.rationale }}</p>
+            {% if scored.evidence %}
+              <ul class="evidence">
+                {% for item in scored.evidence %}
+                  <li><span class="ts">{{ item.timestamp }}</span><span>{{ item.observation }}</span></li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if submission.application_answers() %}
+      <div class="card">
+        <h2>Written application</h2>
+        <dl class="answers">
+          {% for key, value in submission.application_answers().items() %}
+            <div><dt>{{ key }}</dt><dd>{{ value }}</dd></div>
+          {% endfor %}
+        </dl>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <h2>AI evaluation</h2>
+      {% if submission.score is none %}
+        <p class="empty-state">Not evaluated yet.</p>
+      {% else %}
+        <div style="display:flex;gap:28px;margin-bottom:14px">
+          <div class="tile">
+            <div class="label">Score</div>
+            <div class="value">{{ submission.score }}</div>
+          </div>
+          <div class="tile">
+            <div class="label">Confidence</div>
+            <div class="value">{{ submission.confidence }}%</div>
+          </div>
+        </div>
+        {% if submission.get('Feedback') %}
+          <p style="font-size:0.88rem;margin:0 0 14px">{{ submission.get('Feedback') }}</p>
+        {% endif %}
+        {% if submission.strengths %}
+          <div class="label" style="margin-bottom:5px">Strengths</div>
+          <ul style="margin:0 0 14px;padding-left:18px;font-size:0.85rem;color:var(--text-secondary)">
+            {% for item in submission.strengths %}<li>{{ item }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+        {% if submission.areas_to_improve %}
+          <div class="label" style="margin-bottom:5px">Areas to improve</div>
+          <ul style="margin:0 0 14px;padding-left:18px;font-size:0.85rem;color:var(--text-secondary)">
+            {% for item in submission.areas_to_improve %}<li>{{ item }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+        {% if submission.flags %}
+          <div class="label" style="margin-bottom:6px">Flags</div>
+          <div class="chips">
+            {% for flag in submission.flags %}<span class="flag">{{ flag.replace('_', ' ') }}</span>{% endfor %}
+          </div>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2>Reviewer decision</h2>
+      {% if submission.reviewer_decision %}
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          {{ decision_pill(submission.reviewer_decision) }}
+          {% if submission.was_overridden %}
+            <span style="font-size:0.78rem;color:var(--muted)">
+              overrode the AI's {{ submission.ai_decision|lower }}
+            </span>
+          {% endif %}
+        </div>
+        <p style="font-size:0.82rem;color:var(--text-secondary);margin:0">
+          {{ submission.get('Reviewer') }} · {{ submission.get('Reviewed At') }}
+        </p>
+        {% if submission.get('Reviewer Notes') %}
+          <p style="font-size:0.86rem;margin:10px 0 0">{{ submission.get('Reviewer Notes') }}</p>
+        {% endif %}
+        <p style="font-size:0.78rem;color:var(--muted);margin:14px 0 0">
+          This row is final. Re-running evaluation will skip it.
+        </p>
+      {% elif submission.score is none %}
+        <p class="empty-state">Evaluate it first, or decide without the AI below.</p>
+        {% include "_review_form.html" %}
+      {% else %}
+        {% include "_review_form.html" %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -113,7 +113,7 @@ def test_the_evaluator_receives_frames_transcript_and_the_form_answers(tmp_path,
     call = evaluator.calls[0]
     assert len(call["frames"]) == 4
     assert call["duration"] == 120.0
-    assert call["form_response"] == {"Timestamp": "t", "Name": "Jane"}
+    assert call["form_response"] == {"Name": "Jane"}  # Timestamp is bookkeeping, not an answer
     assert "Hello, I'm Jane." in call["transcript"].text
 
 

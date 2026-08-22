@@ -28,7 +28,8 @@ hr_agents/transcribe.py   Speech-to-text (faster-whisper by default)
 hr_agents/evaluator.py    The Claude call
 hr_agents/store.py        Google Sheets / CSV, behind one interface
 hr_agents/pipeline.py     Stages 4-7, one row at a time
-hr_agents/cli.py          `hr-agents run` / `hr-agents check`
+hr_agents/web/            The review app (FastAPI + server-rendered HTML)
+hr_agents/cli.py          `hr-agents run` / `check` / `serve`
 
 config/rubric.yaml        Criteria, weights, thresholds, prohibited factors
 prompts/video_evaluation.md   System + user prompt templates
@@ -39,7 +40,7 @@ schemas/evaluation_result.json  Generated from models.py
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e '.[sheets,transcribe,dev]'
+pip install -e '.[web,sheets,transcribe,dev]'
 cp .env.example .env        # then fill it in
 ```
 
@@ -49,7 +50,31 @@ For the Google Sheets store, create a service account, download its JSON key,
 point `GOOGLE_APPLICATION_CREDENTIALS` at it, and share both the spreadsheet and
 the Drive folder holding the videos with the service account's email address.
 
-## Running
+## The app
+
+```bash
+python scripts/seed_demo.py demo.csv          # sample data, so you can see it working
+HR_AGENTS_CSV_PATH=demo.csv hr-agents serve   # http://127.0.0.1:8000
+```
+
+Four pages, all reading and writing the same spreadsheet the CLI uses:
+
+- **Dashboard** — pass rate, score distribution, decision breakdown, flags raised,
+  and the override rate. Nothing is stored in the app itself.
+- **Submissions** — the queue, filterable by decision or by error. Shows the AI's
+  call and the final call side by side, marking the rows a human overturned.
+- **Submission detail** — the video, every criterion score with its rationale and
+  timestamped evidence, the written application, and the review form.
+- **New submission** — stands in for the applicant-facing form so you can run the
+  pipeline end to end before wiring up the real one.
+
+Two rules the app enforces rather than suggests: overriding the AI requires a
+written note, and a row a reviewer has decided is never re-evaluated.
+
+`Evaluate pending` on the dashboard runs the pipeline in the background. One run
+at a time — concurrent runs would race each other writing the same rows.
+
+## Running from the command line
 
 ```bash
 hr-agents check              # validate the rubric and settings, then exit
@@ -75,7 +100,7 @@ refuses to start. `hr-agents check` validates a change before you run a batch.
 ## Development
 
 ```bash
-pytest                              # 38 tests, no network, no ffmpeg needed
+pytest                              # 62 tests, no network, no ffmpeg needed
 python scripts/generate_schema.py   # after changing hr_agents/models.py
 ```
 

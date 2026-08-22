@@ -1,18 +1,19 @@
 """The spreadsheet, behind an interface.
 
-`docs/spreadsheet_schema.md` is the contract this implements. Two rules matter
-more than the transport: the pipeline writes only to its own columns, and a row
-a human has already decided is never touched again.
+`docs/spreadsheet_schema.md` is the contract this implements. Three rules matter
+more than the transport: the pipeline writes only pipeline columns, reviewers
+write only reviewer columns, and a row a human has decided is never re-evaluated.
 """
 
 from __future__ import annotations
 
 import csv
 import json
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Protocol
+from typing import Iterable
 
 from .models import ScoredEvaluation
 
@@ -21,7 +22,7 @@ VIDEO_LINK = "Video Link"
 STATUS = "Status"
 REVIEWER_DECISION = "Reviewer Decision"
 
-# Columns the pipeline owns. Nothing outside this set is ever written.
+# Columns the pipeline owns. Nothing outside this set is ever written by a run.
 PIPELINE_COLUMNS = (
     STATUS,
     "AI Score",
@@ -37,11 +38,21 @@ PIPELINE_COLUMNS = (
     "Error",
 )
 
-# Columns the pipeline never treats as part of the applicant's form response.
-NON_FORM_COLUMNS = frozenset(
-    PIPELINE_COLUMNS
-    + (SUBMISSION_ID, VIDEO_LINK, REVIEWER_DECISION, "Reviewer", "Reviewer Notes", "Reviewed At")
-)
+# Columns a human reviewer owns. The pipeline never touches these.
+REVIEWER_COLUMNS = ("Reviewer", REVIEWER_DECISION, "Reviewer Notes", "Reviewed At")
+
+MANAGED_COLUMNS = PIPELINE_COLUMNS + REVIEWER_COLUMNS
+
+# Never part of the applicant's form response. Timestamp is form bookkeeping —
+# the submission time tells the model nothing about the video.
+NON_FORM_COLUMNS = frozenset(MANAGED_COLUMNS + (SUBMISSION_ID, VIDEO_LINK, "Timestamp"))
+
+# Additionally redundant on the detail page, where they already head the record.
+IDENTITY_COLUMNS = ("Name", "Email")
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 @dataclass
@@ -49,28 +60,94 @@ class Submission:
     row_number: int
     values: dict[str, str] = field(default_factory=dict)
 
+    def get(self, column: str) -> str:
+        return str(self.values.get(column, "")).strip()
+
     @property
     def submission_id(self) -> str:
-        return self.values.get(SUBMISSION_ID, "").strip() or f"row-{self.row_number}"
+        return self.get(SUBMISSION_ID) or f"row-{self.row_number}"
+
+    @property
+    def name(self) -> str:
+        return self.get("Name") or self.submission_id
+
+    @property
+    def email(self) -> str:
+        return self.get("Email")
 
     @property
     def video_link(self) -> str:
-        return self.values.get(VIDEO_LINK, "").strip()
+        return self.get(VIDEO_LINK)
 
     @property
     def status(self) -> str:
-        return self.values.get(STATUS, "").strip().upper()
+        return self.get(STATUS).upper()
+
+    @property
+    def ai_decision(self) -> str:
+        return self.get("AI Decision")
 
     @property
     def reviewer_decision(self) -> str:
-        return self.values.get(REVIEWER_DECISION, "").strip()
+        return self.get(REVIEWER_DECISION)
+
+    @property
+    def final_decision(self) -> str:
+        """The reviewer's call when there is one, otherwise the AI's."""
+        return self.reviewer_decision or self.ai_decision
+
+    @property
+    def was_overridden(self) -> bool:
+        return bool(self.reviewer_decision and self.ai_decision) and (
+            self.reviewer_decision != self.ai_decision
+        )
+
+    @property
+    def score(self) -> int | None:
+        raw = self.get("AI Score")
+        return int(raw) if raw.isdigit() else None
+
+    @property
+    def confidence(self) -> int | None:
+        raw = self.get("Confidence")
+        return int(raw) if raw.isdigit() else None
+
+    @property
+    def flags(self) -> list[str]:
+        return [f.strip() for f in self.get("Flags").split(";") if f.strip()]
+
+    @property
+    def strengths(self) -> list[str]:
+        return [s.strip() for s in self.get("Strengths").split(";") if s.strip()]
+
+    @property
+    def areas_to_improve(self) -> list[str]:
+        return [s.strip() for s in self.get("Areas to Improve").split(";") if s.strip()]
+
+    def criterion_scores(self) -> list[dict]:
+        raw = self.get("Criterion Scores")
+        if not raw:
+            return []
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+        return parsed if isinstance(parsed, list) else []
 
     def form_response(self) -> dict[str, str]:
-        """Only what the applicant actually submitted — no pipeline bookkeeping."""
+        """Only what the applicant submitted — no pipeline bookkeeping."""
         return {
             key: value
             for key, value in self.values.items()
             if key not in NON_FORM_COLUMNS and str(value).strip()
+        }
+
+    def application_answers(self) -> dict[str, str]:
+        """The form response minus the fields already shown elsewhere on the page."""
+        return {
+            key: value
+            for key, value in self.form_response().items()
+            if key not in IDENTITY_COLUMNS
         }
 
     def is_pending(self) -> bool:
@@ -79,11 +156,6 @@ class Submission:
         if not self.video_link:
             return False  # no video yet — stage 4 has not run
         return self.status in ("", "PENDING", "ERROR")
-
-
-class SubmissionStore(Protocol):
-    def pending(self) -> list[Submission]: ...
-    def update(self, submission: Submission, values: dict[str, str]) -> None: ...
 
 
 def result_columns(evaluation: ScoredEvaluation) -> dict[str, str]:
@@ -102,61 +174,113 @@ def result_columns(evaluation: ScoredEvaluation) -> dict[str, str]:
             [c.model_dump() for c in result.criteria], ensure_ascii=False
         ),
         "Rubric Version": str(evaluation.rubric_version),
-        "Evaluated At": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "Evaluated At": _now(),
         "Error": "",
     }
 
 
 def error_columns(message: str) -> dict[str, str]:
+    return {STATUS: "ERROR", "Error": message[:1000], "Evaluated At": _now()}
+
+
+def review_columns(decision: str, reviewer: str, notes: str = "") -> dict[str, str]:
     return {
-        STATUS: "ERROR",
-        "Error": message[:1000],
-        "Evaluated At": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        REVIEWER_DECISION: decision,
+        "Reviewer": reviewer,
+        "Reviewer Notes": notes,
+        "Reviewed At": _now(),
     }
 
 
-class CsvStore:
-    """A CSV file standing in for the spreadsheet. For local development and tests."""
+class SubmissionStore(ABC):
+    """Read every row; write only the columns the caller is allowed to write."""
+
+    @abstractmethod
+    def all(self) -> list[Submission]: ...
+
+    @abstractmethod
+    def _write(self, submission: Submission, values: dict[str, str]) -> None: ...
+
+    @abstractmethod
+    def append(self, values: dict[str, str]) -> Submission: ...
+
+    def pending(self) -> list[Submission]:
+        return [s for s in self.all() if s.is_pending()]
+
+    def get(self, submission_id: str) -> Submission | None:
+        for submission in self.all():
+            if submission.submission_id == submission_id:
+                return submission
+        return None
+
+    def update(self, submission: Submission, values: dict[str, str]) -> None:
+        """Write pipeline columns. Used by the evaluation run."""
+        self._guard(values, PIPELINE_COLUMNS, "pipeline")
+        self._write(submission, values)
+
+    def record_review(self, submission: Submission, values: dict[str, str]) -> None:
+        """Write reviewer columns. Used by a human in the app."""
+        self._guard(values, REVIEWER_COLUMNS, "reviewer")
+        self._write(submission, values)
+
+    @staticmethod
+    def _guard(values: dict[str, str], allowed: Iterable[str], label: str) -> None:
+        unknown = set(values) - set(allowed)
+        if unknown:
+            raise ValueError(f"Refusing to write non-{label} columns: {sorted(unknown)}")
+
+
+class CsvStore(SubmissionStore):
+    """A CSV file standing in for the spreadsheet. Local development and tests."""
 
     def __init__(self, path: str | Path):
         self.path = Path(path)
 
     def _read(self) -> tuple[list[str], list[dict[str, str]]]:
+        if not self.path.exists():
+            return [], []
         with self.path.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
             headers = list(reader.fieldnames or [])
-            rows = [{k: (v or "") for k, v in row.items()} for row in reader]
-        for column in PIPELINE_COLUMNS:
+            rows = [{k: (v or "") for k, v in row.items() if k is not None} for row in reader]
+        for column in MANAGED_COLUMNS:
             if column not in headers:
                 headers.append(column)
-                for row in rows:
-                    row.setdefault(column, "")
+        for row in rows:
+            for column in headers:
+                row.setdefault(column, "")
         return headers, rows
 
-    def _write(self, headers: list[str], rows: Iterable[dict[str, str]]) -> None:
+    def _save(self, headers: list[str], rows: Iterable[dict[str, str]]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=headers)
             writer.writeheader()
             for row in rows:
                 writer.writerow({h: row.get(h, "") for h in headers})
 
-    def pending(self) -> list[Submission]:
+    def all(self) -> list[Submission]:
         _, rows = self._read()
-        submissions = [Submission(row_number=i + 2, values=row) for i, row in enumerate(rows)]
-        return [s for s in submissions if s.is_pending()]
+        return [Submission(row_number=i + 2, values=row) for i, row in enumerate(rows)]
 
-    def update(self, submission: Submission, values: dict[str, str]) -> None:
-        unknown = set(values) - set(PIPELINE_COLUMNS)
-        if unknown:
-            raise ValueError(f"Refusing to write non-pipeline columns: {sorted(unknown)}")
+    def _write(self, submission: Submission, values: dict[str, str]) -> None:
         headers, rows = self._read()
-        index = submission.row_number - 2
-        rows[index].update(values)
+        rows[submission.row_number - 2].update(values)
         submission.values.update(values)
-        self._write(headers, rows)
+        self._save(headers, rows)
+
+    def append(self, values: dict[str, str]) -> Submission:
+        headers, rows = self._read()
+        for key in values:
+            if key not in headers:
+                headers.append(key)
+        row = {h: str(values.get(h, "")) for h in headers}
+        rows.append(row)
+        self._save(headers, rows)
+        return Submission(row_number=len(rows) + 1, values=row)
 
 
-class GoogleSheetsStore:
+class GoogleSheetsStore(SubmissionStore):
     """The real store: a worksheet addressed by header name, not column letter.
 
     Reading the header row on every call is deliberate — adding a form question
@@ -190,7 +314,7 @@ class GoogleSheetsStore:
         return [str(h).strip() for h in rows[0]], rows[1:]
 
     def _ensure_columns(self, headers: list[str]) -> list[str]:
-        missing = [c for c in PIPELINE_COLUMNS if c not in headers]
+        missing = [c for c in MANAGED_COLUMNS if c not in headers]
         if not missing:
             return headers
         headers = headers + missing
@@ -202,7 +326,7 @@ class GoogleSheetsStore:
         ).execute()
         return headers
 
-    def pending(self) -> list[Submission]:
+    def all(self) -> list[Submission]:
         headers, rows = self._read()
         if not headers:
             return []
@@ -210,31 +334,52 @@ class GoogleSheetsStore:
         submissions = []
         for offset, row in enumerate(rows):
             padded = list(row) + [""] * (len(headers) - len(row))
-            values = {h: str(v) for h, v in zip(headers, padded)}
-            submissions.append(Submission(row_number=offset + 2, values=values))
-        return [s for s in submissions if s.is_pending()]
+            submissions.append(
+                Submission(
+                    row_number=offset + 2,
+                    values={h: str(v) for h, v in zip(headers, padded)},
+                )
+            )
+        return submissions
 
-    def update(self, submission: Submission, values: dict[str, str]) -> None:
-        unknown = set(values) - set(PIPELINE_COLUMNS)
-        if unknown:
-            raise ValueError(f"Refusing to write non-pipeline columns: {sorted(unknown)}")
+    def _write(self, submission: Submission, values: dict[str, str]) -> None:
         headers, _ = self._read()
         headers = self._ensure_columns(headers)
-
-        data = []
-        for column, value in values.items():
-            letter = _column_letter(headers.index(column) + 1)
-            data.append(
-                {
-                    "range": f"'{self.worksheet}'!{letter}{submission.row_number}",
-                    "values": [[value]],
-                }
-            )
+        data = [
+            {
+                "range": (
+                    f"'{self.worksheet}'!"
+                    f"{_column_letter(headers.index(column) + 1)}{submission.row_number}"
+                ),
+                "values": [[value]],
+            }
+            for column, value in values.items()
+        ]
         self._values().batchUpdate(
             spreadsheetId=self.spreadsheet_id,
             body={"valueInputOption": "RAW", "data": data},
         ).execute()
         submission.values.update(values)
+
+    def append(self, values: dict[str, str]) -> Submission:
+        headers, rows = self._read()
+        headers = self._ensure_columns(headers or list(values))
+        unknown = [key for key in values if key not in headers]
+        if unknown:
+            raise ValueError(
+                f"Sheet has no column for {unknown}. Add the column to the sheet first — "
+                "the app will not reshape a spreadsheet other systems write to."
+            )
+        self._values().append(
+            spreadsheetId=self.spreadsheet_id,
+            range=f"'{self.worksheet}'",
+            valueInputOption="RAW",
+            insertDataOption="INSERT_ROWS",
+            body={"values": [[str(values.get(h, "")) for h in headers]]},
+        ).execute()
+        return Submission(
+            row_number=len(rows) + 2, values={h: str(values.get(h, "")) for h in headers}
+        )
 
 
 def _column_letter(index: int) -> str:

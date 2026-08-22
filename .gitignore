@@ -221,3 +221,6 @@ __marimo__/
 .venv/
 .env
 workdir/
+uploads/
+demo.csv
+submissions.csv

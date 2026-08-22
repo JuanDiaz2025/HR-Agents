@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% from "_macros.html" import decision_pill, status_pill %}
+{% set page = 'dashboard' %}
+{% block title %}Dashboard · HR-Agents{% endblock %}
+
+{% block content %}
+<h1>Screening dashboard</h1>
+<p class="lede">
+  {{ rubric.name }}, version {{ rubric.version }} — pass at {{ rubric.decision.pass_threshold }},
+  human review below {{ rubric.decision.review_threshold }} confidence.
+</p>
+
+<div class="grid kpi" style="margin-bottom:16px">
+  <div class="card tile hero">
+    <div class="label">Pass rate</div>
+    {% if stats.pass_rate is none %}
+      <div class="value empty">No decisions yet</div>
+    {% else %}
+      <div class="value">{{ '%.0f' % stats.pass_rate }}%</div>
+      <div class="note">of {{ stats.decided }} decided</div>
+    {% endif %}
+  </div>
+  <div class="card tile">
+    <div class="label">Submissions</div>
+    <div class="value">{{ stats.total }}</div>
+    <div class="note">{{ stats.evaluated }} evaluated · {{ stats.awaiting_evaluation }} queued</div>
+  </div>
+  <div class="card tile">
+    <div class="label">Awaiting human review</div>
+    <div class="value">{{ stats.awaiting_review }}</div>
+    <div class="note">
+      {% if stats.awaiting_review %}<a href="/submissions?decision=NEEDS+REVIEW">Open the queue</a>
+      {% else %}Nothing waiting{% endif %}
+    </div>
+  </div>
+  <div class="card tile">
+    <div class="label">Override rate</div>
+    {% if stats.override_rate is none %}
+      <div class="value empty">No reviews yet</div>
+      <div class="note">Reviewers have not decided anything</div>
+    {% else %}
+      <div class="value">{{ '%.0f' % stats.override_rate }}%</div>
+      <div class="note">{{ stats.overridden }} of {{ stats.reviewed }} reviewed — high means the rubric is wrong</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid split" style="margin-bottom:16px">
+  <div class="card">
+    <h2>Score distribution</h2>
+    {% if stats.max_bucket == 0 %}
+      <p class="empty-state">No scores yet.</p>
+    {% else %}
+      <div class="dist">
+        <div class="yaxis"><span>{{ stats.max_bucket }}</span><span>0</span></div>
+        <div class="plot">
+          {% for bucket in stats.buckets %}
+            <div class="col {% if bucket.count == stats.max_bucket %}peak{% endif %}"
+                 data-count="{{ bucket.count }}"
+                 title="{{ bucket.label }}: {{ bucket.count }} submission{{ '' if bucket.count == 1 else 's' }}">
+              <div class="bar {% if bucket.count == 0 %}zero{% endif %}"
+                   style="height: {{ (100.0 * bucket.count / stats.max_bucket) if bucket.count else 0 }}%"></div>
+            </div>
+          {% endfor %}
+        </div>
+        <div class="xaxis">
+          {% for bucket in stats.buckets %}<span>{{ bucket.low }}</span>{% endfor %}
+        </div>
+      </div>
+      <p class="note" style="color:var(--muted);font-size:0.76rem;margin:14px 0 0">
+        AI score, before any human override. Pass threshold is {{ rubric.decision.pass_threshold }}.
+      </p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Decisions</h2>
+    {% set total = stats.decisions['PASS'] + stats.decisions['NOT PASS'] + stats.decisions['NEEDS REVIEW'] %}
+    {% if total == 0 %}
+      <p class="empty-state">Nothing evaluated yet.</p>
+    {% else %}
+      <div class="breakdown">
+        {% for key, css in [('PASS','pass'), ('NOT PASS','notpass'), ('NEEDS REVIEW','review')] %}
+          {% if stats.decisions[key] %}
+            <span class="{{ css }}" style="width: {{ 100.0 * stats.decisions[key] / total }}%"
+                  title="{{ key }}: {{ stats.decisions[key] }}"></span>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <div class="breakdown-legend">
+        {% for key in ['PASS', 'NOT PASS', 'NEEDS REVIEW'] %}
+          <div class="row">
+            {{ decision_pill(key) }}
+            <span class="count">{{ stats.decisions[key] }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if stats.errored %}
+      <p style="font-size:0.84rem;color:var(--text-secondary);margin:16px 0 0">
+        {{ stats.errored }} submission{{ '' if stats.errored == 1 else 's' }} failed to evaluate —
+        <a href="/submissions?status=ERROR">see the errors</a>.
+      </p>
+    {% endif %}
+
+    {% if stats.flags %}
+      <h2 style="margin:20px 0 10px">Flags raised</h2>
+      <div class="chips">
+        {% for flag, count in stats.flags.items() %}
+          <span class="flag">{{ flag.replace('_', ' ') }} · {{ count }}</span>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:14px">
+    <h2 style="margin:0">Recent submissions</h2>
+    <form action="/run" method="post" style="margin-left:auto">
+      <button class="primary" type="submit" {% if run_state.running %}disabled{% endif %}>
+        {% if run_state.running %}Evaluating…{% else %}Evaluate pending{% endif %}
+      </button>
+    </form>
+  </div>
+  {% if not recent %}
+    <p class="empty-state">No submissions yet. <a href="/submit">Add one</a>.</p>
+  {% else %}
+    <table>
+      <thead>
+        <tr><th>Applicant</th><th>Status</th><th>Score</th><th>Confidence</th><th>Decision</th><th>Reviewed by</th></tr>
+      </thead>
+      <tbody>
+        {% for s in recent %}
+          <tr>
+            <td><a href="/submissions/{{ s.submission_id }}">{{ s.name }}</a></td>
+            <td>{{ status_pill(s.status) }}</td>
+            <td class="num">{{ s.score if s.score is not none else '—' }}</td>
+            <td class="num">{{ (s.confidence ~ '%') if s.confidence is not none else '—' }}</td>
+            <td>{{ decision_pill(s.final_decision) }}</td>
+            <td>{{ s.get('Reviewer') or '—' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+{% endblock %}

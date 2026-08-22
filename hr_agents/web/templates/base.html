@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}HR-Agents{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="masthead">
+    <span class="wordmark">HR-Agents</span>
+    <nav>
+      <a href="/" {% if page == 'dashboard' %}aria-current="page"{% endif %}>Dashboard</a>
+      <a href="/submissions" {% if page == 'submissions' %}aria-current="page"{% endif %}>Submissions</a>
+      <a href="/submit" {% if page == 'submit' %}aria-current="page"{% endif %}>New submission</a>
+    </nav>
+  </header>
+  <main>
+    {% if run_state.message %}
+      <div class="banner">
+        {% if run_state.running %}Evaluation in progress — reload to check.{% else %}{{ run_state.message }}{% endif %}
+      </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

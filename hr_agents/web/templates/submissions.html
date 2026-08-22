@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "_macros.html" import decision_pill, status_pill %}
+{% set page = 'submissions' %}
+{% block title %}Submissions · HR-Agents{% endblock %}
+
+{% block content %}
+<h1>Submissions</h1>
+<p class="lede">{{ submissions|length }} shown. The reviewer's decision always wins over the AI's.</p>
+
+<div class="chips" style="margin-bottom:20px">
+  <a class="chip" href="/submissions" aria-current="{{ 'true' if not decision and not status else 'false' }}">All</a>
+  {% for value, label in [('NEEDS REVIEW','Needs review'), ('PASS','Pass'), ('NOT PASS','Not pass')] %}
+    <a class="chip" href="/submissions?decision={{ value|urlencode }}"
+       aria-current="{{ 'true' if decision == value else 'false' }}">{{ label }}</a>
+  {% endfor %}
+  <a class="chip" href="/submissions?status=ERROR" aria-current="{{ 'true' if status == 'ERROR' else 'false' }}">Errors</a>
+</div>
+
+<div class="card">
+  {% if not submissions %}
+    <p class="empty-state">Nothing matches this filter.</p>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>Applicant</th><th>Status</th><th>Score</th><th>Confidence</th>
+          <th>AI decision</th><th>Final</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in submissions %}
+          <tr>
+            <td>
+              <a href="/submissions/{{ s.submission_id }}">{{ s.name }}</a>
+              {% if s.email %}<div style="color:var(--muted);font-size:0.78rem">{{ s.email }}</div>{% endif %}
+            </td>
+            <td>{{ status_pill(s.status) }}</td>
+            <td class="num">{{ s.score if s.score is not none else '—' }}</td>
+            <td class="num">{{ (s.confidence ~ '%') if s.confidence is not none else '—' }}</td>
+            <td>{{ decision_pill(s.ai_decision) }}</td>
+            <td>
+              {{ decision_pill(s.final_decision) }}
+              {% if s.was_overridden %}
+                <div style="color:var(--muted);font-size:0.74rem;margin-top:3px">overridden</div>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+{% endblock %}
