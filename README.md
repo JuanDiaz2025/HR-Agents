@@ -1,44 +1,94 @@
 # HR-Agents
 
-AI video evaluation & decision pipeline: applicants fill out a form and submit a
-video; the system scores the video against a configurable rubric, decides
-Pass / Not Pass with a confidence score, logs everything back to the
-spreadsheet, and lets a human reviewer override.
+AI video evaluation & decision pipeline for job applicant screening. Applicants
+fill out a form and submit a video; the service scores each video against a
+configurable rubric, decides Pass / Not Pass with a confidence score, logs
+everything back to the spreadsheet, and leaves the final call overridable by a
+human reviewer.
 
-## Status
+## How it works
 
-Foundation in place. The runtime is not yet built — two decisions are pending
-(see **Open decisions**).
+```
+Form -> Spreadsheet row -> Video linked -> ffmpeg (frames + audio)
+     -> transcript -> Claude scores the rubric -> weighted score + decision
+     -> written back to the row -> human review -> reporting
+```
+
+Full detail in [`docs/architecture.md`](docs/architecture.md); the column
+contract is in [`docs/spreadsheet_schema.md`](docs/spreadsheet_schema.md).
 
 ## Layout
 
 ```
-config/rubric.yaml            Criteria, weights, thresholds, prohibited factors
-prompts/video_evaluation.md   Stage 5 prompt template
-schemas/evaluation_result.json  Contract the model output must satisfy
-docs/architecture.md          The 9-stage pipeline and its design rules
-docs/spreadsheet_schema.md    Column-by-column spec, ownership, invariants
+hr_agents/rubric.py       Rubric loading and validation
+hr_agents/models.py       Structured-output contract (Pydantic)
+hr_agents/scoring.py      Weighted score + decision precedence
+hr_agents/media.py        Video fetch, frame sampling, audio extraction
+hr_agents/transcribe.py   Speech-to-text (faster-whisper by default)
+hr_agents/evaluator.py    The Claude call
+hr_agents/store.py        Google Sheets / CSV, behind one interface
+hr_agents/pipeline.py     Stages 4-7, one row at a time
+hr_agents/cli.py          `hr-agents run` / `hr-agents check`
+
+config/rubric.yaml        Criteria, weights, thresholds, prohibited factors
+prompts/video_evaluation.md   System + user prompt templates
+schemas/evaluation_result.json  Generated from models.py
 ```
 
-## Open decisions
+## Setup
 
-**1. Where the pipeline runs**
-- Google Apps Script bound to the Sheet — no infrastructure, triggers on form
-  submit, but limited runtime and awkward to test.
-- Python service in this repo — full control, testable, needs somewhere to run
-  (Cloud Run / scheduled job) and Sheets API credentials.
-- Existing automation platform (n8n / Make / Zapier) orchestrating an API call.
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -e '.[sheets,transcribe,dev]'
+cp .env.example .env        # then fill it in
+```
 
-**2. How the video is analyzed**
-- Transcript only (speech-to-text, then text evaluation) — cheapest, fastest,
-  blind to anything visual.
-- Multimodal (transcript + sampled frames or native video input) — can assess
-  presentation and on-camera behavior, costs more per submission.
+ffmpeg must be on `PATH` — it does the frame sampling and audio extraction.
 
-## Fairness note
+For the Google Sheets store, create a service account, download its JSON key,
+point `GOOGLE_APPLICATION_CREDENTIALS` at it, and share both the spreadsheet and
+the Drive folder holding the videos with the service account's email address.
 
-`config/rubric.yaml` carries a `prohibited_factors` list that is injected into
-every evaluation prompt. Because this pipeline screens people, that list and the
-`Reviewer Decision` override path are load-bearing, not decoration. The override
-rate is the metric to watch: if reviewers routinely overturn the AI, the rubric
-is wrong.
+## Running
+
+```bash
+hr-agents check              # validate the rubric and settings, then exit
+hr-agents run                # evaluate every pending row
+hr-agents run --limit 5      # useful for a first pass against real data
+```
+
+A row is pending when it has a video link, no `Reviewer Decision`, and a
+`Status` of blank, `PENDING`, or `ERROR`. Re-running is safe: rows are updated
+in place by `Submission ID`, never appended, and a row a human has decided is
+never touched again.
+
+Start with `HR_AGENTS_STORE=csv` against a CSV export of the sheet — it exercises
+the whole pipeline without write access to production data.
+
+## Changing the rubric
+
+Everything about how videos are scored lives in `config/rubric.yaml`: the
+criteria, their weights and anchor descriptions, the pass and review thresholds,
+and which flags force human review. Weights must sum to 100 or the pipeline
+refuses to start. `hr-agents check` validates a change before you run a batch.
+
+## Development
+
+```bash
+pytest                              # 38 tests, no network, no ffmpeg needed
+python scripts/generate_schema.py   # after changing hr_agents/models.py
+```
+
+## Fairness
+
+This pipeline screens people, so two things are load-bearing rather than
+decoration:
+
+- `prohibited_factors` in the rubric is injected verbatim into every evaluation
+  prompt, and the model is instructed that none of it may influence any score.
+- The `Reviewer Decision` column always wins, and low-confidence cases are routed
+  to a human instead of auto-decided.
+
+Watch the override rate — reviewers overturning the AI regularly means the rubric
+is wrong, not that the reviewers are. Before this touches real applicants, run it
+against a set of past submissions with known outcomes and compare.

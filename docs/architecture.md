@@ -34,12 +34,36 @@ Pass / Not Pass decision with a score, confidence, and written feedback.
 
 ## Stage 5 in detail
 
-1. Fetch the video from its storage location.
-2. Produce the analysis inputs (transcript and/or sampled frames — see the
-   open decision in the README).
-3. Send the rubric + inputs to the model with `prompts/video_evaluation.md`.
-4. Validate the response against `schemas/evaluation_result.json`. Retry once on
-   a schema failure; on a second failure, write `ERROR` and flag for review.
-5. Compute the weighted score and the decision locally in code — the model
-   scores the criteria, the code applies the threshold. This keeps the pass bar
-   deterministic and auditable.
+1. Fetch the video (`hr_agents/media.py`) — a local path, an HTTP URL, or a
+   Google Drive share link.
+2. Sample N frames evenly across the video and extract 16 kHz mono audio, both
+   via ffmpeg. Transcribe the audio to timestamped segments
+   (`hr_agents/transcribe.py`).
+3. Send the rubric (system prompt, cached) plus the frames, transcript, and form
+   response (user turn) to Claude — `hr_agents/evaluator.py`, template in
+   `prompts/video_evaluation.md`.
+4. The response is constrained to `schemas/evaluation_result.json` via structured
+   outputs, so it is a validated object rather than parsed prose.
+5. Compute the weighted score and the decision locally (`hr_agents/scoring.py`) —
+   the model scores criteria, the code applies the threshold. This keeps the pass
+   bar deterministic and auditable.
+
+### Why frames rather than the whole video
+
+A screening video is a person talking to a camera. Nearly all the visual signal
+the rubric asks about — is this the applicant, are they prepared, is the setting
+appropriate — survives sampling. Six stills plus a full transcript costs a small
+fraction of streaming the video, and the prompt tells the model explicitly not
+to infer anything about the moments between frames.
+
+## Decision precedence
+
+`hr_agents/scoring.py` applies these in order, and the first match wins:
+
+1. A flag in `decision.flags_requiring_review` -> `NEEDS REVIEW`.
+2. Model confidence below `decision.review_threshold` -> `NEEDS REVIEW`.
+3. A criterion marked `compliance: true` scoring 0 -> `NOT PASS`.
+4. Weighted score against `decision.pass_threshold` -> `PASS` / `NOT PASS`.
+
+Confidence outranks the compliance auto-fail deliberately: if the model is not
+sure what it saw, a human should be the one to fail someone.

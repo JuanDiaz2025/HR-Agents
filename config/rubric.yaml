@@ -1,74 +1,96 @@
-# Evaluation rubric. Edit this file to change how videos are scored — no code
-# changes required. Weights must sum to 100.
+# Job applicant video screening rubric.
+#
+# Edit this file to change how videos are scored — no code changes required.
+# Criterion weights must sum to 100 or the pipeline refuses to start.
 
 version: 1
-name: "Default video screening rubric"
+name: "Job applicant video screening"
 
 decision:
   pass_threshold: 75        # weighted score >= this  -> PASS
-  review_threshold: 70      # confidence < this       -> NEEDS REVIEW (no auto-decision)
-  auto_fail_on_compliance: true   # any criterion with compliance:true scoring 0 -> NOT PASS
+  review_threshold: 70      # model confidence < this -> NEEDS REVIEW (no auto-decision)
+  auto_fail_on_compliance: true   # any criterion marked compliance:true scoring 0 -> NOT PASS
+  flags_requiring_review:
+    - unintelligible_audio
+    - video_truncated
+    - wrong_person_or_topic
+    - possible_ai_generated
+    - prohibited_content
+    - duplicate_submission
+    - technical_error
 
 criteria:
-  - id: clarity
-    name: "Clarity"
+  - id: communication
+    name: "Communication & clarity"
     weight: 20
     description: >
       Speech is intelligible and well paced. Ideas are organized and easy to
       follow. Audio and video quality are good enough to assess the response.
     scoring:
-      0:  "Largely unintelligible, or audio/video unusable."
+      0: "Largely unintelligible, or audio/video unusable."
       50: "Understandable but rambling, rushed, or hard to follow in places."
-      100: "Clear, well paced, and easy to follow throughout."
+      100: "Clear, well organized, and easy to follow throughout."
 
   - id: completeness
     name: "Completeness"
-    weight: 25
+    weight: 20
     description: >
-      Every question or prompt the applicant was asked is addressed with enough
+      Every question the applicant was asked to answer is addressed with enough
       substance to judge.
     scoring:
-      0:  "Most prompts unaddressed."
-      50: "Some prompts addressed, others skipped or answered superficially."
-      100: "All prompts addressed with substance."
+      0: "Most questions unaddressed."
+      50: "Some questions addressed, others skipped or answered superficially."
+      100: "All questions addressed with substance."
 
-  - id: accuracy
-    name: "Accuracy"
-    weight: 25
+  - id: relevant_experience
+    name: "Relevant experience"
+    weight: 20
     description: >
-      Claims are internally consistent and consistent with the form responses.
-      No statements that contradict the submitted application.
+      Concrete, specific evidence of experience relevant to the role — real
+      examples of work done, not general statements of interest or enthusiasm.
     scoring:
-      0:  "Clear contradictions with the form, or plainly false claims."
+      0: "No relevant experience described."
+      50: "Relevant experience claimed but described only in generalities."
+      100: "Specific examples with enough detail to verify in an interview."
+
+  - id: consistency
+    name: "Consistency with application"
+    weight: 15
+    description: >
+      Statements in the video are internally consistent and consistent with the
+      written form response. No claims that contradict the submitted application.
+    scoring:
+      0: "Clear contradictions with the written application."
       50: "Minor inconsistencies or unverifiable claims."
-      100: "Consistent with the form and internally coherent."
+      100: "Consistent with the application and internally coherent."
 
   - id: compliance
-    name: "Compliance"
-    weight: 15
+    name: "Instruction compliance"
+    weight: 10
     compliance: true
     description: >
-      Required disclosures/statements are present, and the submission follows the
-      stated rules (length, format, no prohibited content).
+      The submission follows the stated instructions — required topics covered,
+      within the stated length, correct format, no prohibited content.
     scoring:
-      0:  "Required element missing or a rule was broken."
-      50: "Present but incomplete."
-      100: "Fully compliant."
+      0: "A required instruction was ignored or a rule was broken."
+      50: "Followed, but incompletely."
+      100: "Fully compliant with the submission instructions."
 
-  - id: behavior_tone
-    name: "Behavior / Tone"
+  - id: professionalism
+    name: "Professionalism"
     weight: 15
     description: >
-      Professional, respectful, appropriately engaged for the context.
+      Respectful, appropriately prepared, and engaged for a workplace context.
     scoring:
-      0:  "Unprofessional or inappropriate."
-      50: "Acceptable but flat, distracted, or inconsistent."
-      100: "Professional and appropriately engaged."
+      0: "Unprofessional or inappropriate conduct."
+      50: "Acceptable but visibly unprepared or disengaged."
+      100: "Prepared, respectful, and appropriately engaged."
 
-# Add your own criteria here. Any criterion added to this list is automatically
+# Add your own criteria above. Any criterion in this list is automatically
 # scored and included in the weighted total — remember to rebalance weights.
 
-# Things the evaluator must NOT consider, at any point, for any criterion.
+# Factors the evaluator must NOT consider, for any criterion, in any direction.
+# This list is injected verbatim into every evaluation prompt.
 prohibited_factors:
   - "Race, ethnicity, skin tone, or national origin"
   - "Sex, gender identity, or gender expression"
@@ -79,3 +101,4 @@ prohibited_factors:
   - "Physical attractiveness, body type, or grooming beyond stated requirements"
   - "Accent or dialect, except where it genuinely prevents comprehension"
   - "Home environment, background, or apparent socioeconomic status"
+  - "Video or audio equipment quality, except where it prevents assessment"
