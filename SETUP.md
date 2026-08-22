@@ -38,7 +38,7 @@ git clone <this repo> && cd HR-Agents
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 
-pytest -q                                     # 99 tests, no credentials needed
+pytest -q                                     # 109 tests, no credentials needed
 python scripts/simulate_interview.py          # a full interview, printed
 python scripts/simulate_interview.py --interactive   # you play the candidate
 ```
@@ -275,18 +275,48 @@ point is to interrupt a human exactly when a human decision is needed.
 
 ---
 
-## Step 7 — monday.com (optional, and the fiddliest)
+## Step 7 — monday.com
 
-1. **Create the board.** Add three groups, named however you like, e.g.
-   *Screening — Proceed*, *Screening — Review*, *Rejected*.
-2. **Add columns.** At minimum: Email, Phone, Status, Numbers (score), Long Text
-   (summary), Link (transcript), Date. On the Status column, add the labels
-   `PROCEED`, `REVIEW`, `DO_NOT_PROCEED`.
-3. **Get an API token**: avatar → Developers → My Access Tokens.
-4. **Get the board id**: it is in the board URL —
-   `monday.com/boards/`**`1234567890`**.
-5. **Get the group ids and column ids.** These are internal ids, not the labels
-   you typed, and they differ on every board. Query them:
+**Your board is already identified.** I read your workspace: the live pipeline is
+**Hiring / Talent Acquisition** in the *Twin Home Buyer* workspace.
+(`Recruitment`, board `5586564350` in *Matrix Group One*, is a stale duplicate —
+don't point at that one.)
+
+```bash
+MONDAY_API_KEY=<get this yourself: avatar -> Developers -> My Access Tokens>
+MONDAY_BOARD_ID=4277249290
+
+# Proposed group mapping — confirm this matches how you want candidates to flow:
+MONDAY_GROUP_PROCEED=new_group59160      # "Initial Interview"  (advance to a human)
+MONDAY_GROUP_REVIEW=new_group49772       # "Applicant Screening" (a human looks)
+MONDAY_GROUP_REJECTED=new_group56420     # "Applicants that will not continue"
+
+# Only columns that exist on your board:
+MONDAY_COLUMN_MAP={"status":"dup__of_progress","score":"text8","interview_date":"date"}
+```
+
+Three things to know about that board specifically:
+
+1. **`Score` is a text column** (`text8`), not a Numbers column. The client reads
+   your board's schema and shapes each value to the actual column type, so this
+   works — but you will not be able to sort or average on it. Add a Numbers
+   column and remap `score` to it if you want that.
+2. **The status labels don't match.** Your Status column has *Passed / Failed /
+   Pending / final Screening / …*, not `PROCEED / REVIEW / DO_NOT_PROCEED`.
+   As written the app creates those three as new labels. If you'd rather it
+   reuse *Passed / Pending / Failed*, say so and I'll add a label mapping.
+3. **There's no Email column**, so candidates are matched by nothing and a
+   re-run creates a second item. Add an Email column and map it
+   (`"email":"<new id>"`) to get update-in-place instead of duplicates.
+
+The full scorecard — every category score with its justification, the summary,
+strengths, concerns and the transcript link — is posted as an **item update**,
+which needs no columns at all. So even with the minimal map above you lose
+nothing; the columns are only for sorting and board views.
+
+### Doing this for a different board
+
+Get the group and column ids for any board with:
 
 ```bash
 curl -s https://api.monday.com/v2 \
@@ -296,25 +326,12 @@ curl -s https://api.monday.com/v2 \
   | python -m json.tool
 ```
 
-6. Map them. **Only the logical fields you map get written** — anything
-   unmapped is skipped rather than guessed at, because writing to the wrong
-   column silently corrupts a board.
-
-```bash
-MONDAY_API_KEY=...
-MONDAY_BOARD_ID=1234567890
-MONDAY_GROUP_PROCEED=group_title_abc
-MONDAY_GROUP_REVIEW=group_title_def
-MONDAY_GROUP_REJECTED=group_title_ghi
-MONDAY_COLUMN_MAP={"email":"email","phone":"phone","status":"status","score":"numbers","summary":"long_text","transcript":"link","interview_date":"date4","communication":"numbers1","experience":"numbers2","availability":"numbers3"}
-```
-
-Recognised logical keys: `email`, `phone`, `status`, `score`, `role`,
-`interview_date`, `summary`, `transcript`, `recording`, `communication`,
-`experience`, `availability`. If you map `email`, existing candidates are
-matched by it and updated rather than duplicated.
-
----
+Recognised logical keys for `MONDAY_COLUMN_MAP`: `email`, `phone`, `status`,
+`score`, `role`, `interview_date`, `summary`, `transcript`, `recording`,
+`communication`, `experience`, `availability`. **Only what you map gets
+written** — an unmapped field, a column id that doesn't exist, or a column of a
+type the app can't safely write (file, people, formula) is skipped with a
+warning rather than guessed at.
 
 ## Step 8 — Go-live checklist
 
@@ -389,6 +406,7 @@ timezone means calling a candidate at the wrong hour.
 | Bot waits too long | Lower `ANSWER_DEBOUNCE_S` |
 | `507` when booking | Ad-hoc bot pool exhausted — schedule more than 10 minutes ahead |
 | Nothing in Sheets | Spreadsheet not shared with the service-account email |
-| monday item created, columns empty | `MONDAY_COLUMN_MAP` ids wrong — re-run the GraphQL query in step 7 |
+| monday item created, columns empty | `MONDAY_COLUMN_MAP` ids wrong, or the columns are types the app won't write — the logs name each one it skipped |
+| Duplicate monday items for one candidate | No `email` column mapped, so there is nothing to match on |
 | Scores look meaningless | `ANTHROPIC_API_KEY` unset, so the scripted brain is running — check `/health/integrations` |
 | Duplicate rows or items | Should not happen; both sinks are keyed. File it with the interview id |

@@ -222,7 +222,7 @@ class ResultsPipeline:
                     f"score_{c['key']}": c["score"] for c in sc.category_scores
                 },
             }
-            note = self._monday_note(sc, interview)
+            note = self._monday_note(sc, interview, transcript_url)
             name = candidate.full_name
             recommendation = sc.recommendation
             scorecard_id = sc.id
@@ -255,7 +255,12 @@ class ResultsPipeline:
         await self._notify(name, recommendation, row, note)
 
     @staticmethod
-    def _monday_note(sc: Scorecard, interview: Interview) -> str:
+    def _monday_note(sc: Scorecard, interview: Interview, transcript_url: str = "") -> str:
+        """The full scorecard as an item update.
+
+        This is the one output that needs no board columns at all — a board with
+        nothing but a Name column still gets the complete result here.
+        """
         lines = [f"*AI screening result: {sc.recommendation.value}* ({sc.overall_score}/100)", ""]
         for cat in sc.category_scores:
             lines.append(f"- {cat['label']}: {cat['score']}/{cat['max']:g} — {cat.get('justification', '')}")
@@ -266,7 +271,9 @@ class ResultsPipeline:
             lines += ["", "Concerns:"] + [f"- {c}" for c in sc.concerns]
         if sc.disqualification_reasons:
             lines += ["", "Disqualified:"] + [f"- {r}" for r in sc.disqualification_reasons]
-        lines += ["", f"Interview ID: {interview.id}"]
+        if transcript_url:
+            lines += ["", f"Full transcript: {transcript_url}"]
+        lines += [f"Interview ID: {interview.id}"]
         return "\n".join(lines)
 
     async def _notify(

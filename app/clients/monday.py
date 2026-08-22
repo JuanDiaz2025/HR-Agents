@@ -39,6 +39,7 @@ class MondayClient:
         self.settings = settings or get_settings()
         if not (self.settings.monday_api_key and self.settings.monday_board_id):
             raise RuntimeError("MONDAY_API_KEY and MONDAY_BOARD_ID are required")
+        self._column_types: dict[str, str] | None = None
         self._client = client or httpx.AsyncClient(
             timeout=httpx.Timeout(30.0, connect=10.0),
             headers={
@@ -60,6 +61,60 @@ class MondayClient:
         if payload.get("errors"):
             raise RuntimeError(f"monday.com GraphQL error: {payload['errors']}")
         return payload.get("data", {})
+
+    # ------------------------------------------------------------------ schema
+    async def column_types(self) -> dict[str, str]:
+        """`{column_id: type}` for the board, fetched once and cached.
+
+        Needed because the same logical field can point at differently typed
+        columns on different boards — a score may be a `numbers` column on one
+        board and a `text` column on another, and monday rejects (or silently
+        drops) a value in the wrong shape.
+        """
+        if self._column_types is None:
+            data = await self._gql(
+                """
+                query ($board: ID!) {
+                  boards(ids: [$board]) { columns { id type } }
+                }
+                """,
+                {"board": str(self.settings.monday_board_id)},
+            )
+            boards = data.get("boards") or []
+            columns = (boards[0].get("columns") if boards else []) or []
+            self._column_types = {c["id"]: c["type"] for c in columns}
+            log.info("monday board %s columns: %s", self.settings.monday_board_id, self._column_types)
+        return self._column_types
+
+    @staticmethod
+    def coerce(column_type: str, value: Any) -> Any:
+        """Shape a value for a monday column type. Returns `None` to skip."""
+        if value is None:
+            return None
+        if column_type in ("text", "long-text", "long_text"):
+            # A status label or a number in a text column is still readable.
+            if isinstance(value, dict):
+                value = value.get("label") or value.get("text") or value.get("url")
+            return str(value)
+        if column_type in ("numbers", "numeric"):
+            if isinstance(value, dict):
+                return None
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+        if column_type in ("status", "color", "dropdown"):
+            if isinstance(value, dict):
+                return value
+            return {"label": str(value)}
+        if column_type in ("email", "phone", "link", "date", "location"):
+            return value if isinstance(value, dict) else None
+        if column_type == "name":
+            return str(value)
+        # Unrecognised type (file, people, board-relation, formula, ...). Writing
+        # a guess would corrupt the column, so skip and say so.
+        log.warning("monday column type %r is not writable by this app — skipping", column_type)
+        return None
 
     # ------------------------------------------------------------------ lookups
     async def find_item(self, *, email: str) -> str | None:
@@ -83,15 +138,37 @@ class MondayClient:
         return items[0]["id"] if items else None
 
     # -------------------------------------------------------------------- write
-    def build_column_values(self, **fields: Any) -> dict[str, Any]:
-        """Translate logical fields into this board's column ids and value shapes."""
+    def build_column_values(
+        self, column_types: dict[str, str] | None = None, **fields: Any
+    ) -> dict[str, Any]:
+        """Translate logical fields into this board's column ids and value shapes.
+
+        `column_types` comes from `column_types()`. Without it the canonical
+        shape for each field is used, which is right for a board whose columns
+        are the expected types.
+        """
         cmap = self.settings.monday_column_map
         out: dict[str, Any] = {}
 
         def put(logical: str, value: Any) -> None:
             column_id = cmap.get(logical)
-            if column_id and value is not None:
-                out[column_id] = value
+            if not column_id or value is None:
+                return
+            if column_types is not None:
+                column_type = column_types.get(column_id)
+                if column_type is None:
+                    log.warning(
+                        "MONDAY_COLUMN_MAP maps %r to column %r, which does not exist on "
+                        "board %s — skipping",
+                        logical,
+                        column_id,
+                        self.settings.monday_board_id,
+                    )
+                    return
+                value = self.coerce(column_type, value)
+                if value is None:
+                    return
+            out[column_id] = value
 
         put("email", {"email": fields.get("email"), "text": fields.get("email")}
             if fields.get("email") else None)
@@ -120,8 +197,13 @@ class MondayClient:
         **fields: Any,
     ) -> str | None:
         group_id = getattr(self.settings, GROUP_FOR[recommendation], None)
+        try:
+            types = await self.column_types()
+        except Exception:
+            log.exception("could not read the monday board schema — using canonical shapes")
+            types = None
         column_values = self.build_column_values(
-            recommendation=recommendation.value, **fields
+            column_types=types, recommendation=recommendation.value, **fields
         )
 
         item_id = await self.find_item(email=fields.get("email", "")) if fields.get("email") else None

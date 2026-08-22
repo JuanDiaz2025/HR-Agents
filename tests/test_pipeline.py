@@ -210,3 +210,21 @@ async def test_a_sink_failure_does_not_lose_the_scorecard(kb, fake_brain, make_i
         assert sc is not None and sc.overall_score == 80.0
         assert sc.monday_item_id is None
         assert sc.sheet_row is not None  # the sheet write still landed
+
+
+async def test_monday_update_carries_the_whole_result_without_any_columns(
+    kb, fake_brain, make_interview
+):
+    """A board with nothing mapped still gets the full scorecard, because it all
+    goes into the item update."""
+    iv = make_interview()
+    add_turns(iv, [("interviewer", "Q"), ("candidate", "A")])
+    mark(iv, InterviewStatus.completed)
+    pipeline = build_pipeline(kb, fake_brain())
+    await pipeline.run(iv)
+
+    note = pipeline.monday.calls[-1]["note"]
+    assert "PROCEED" in note
+    assert "80.0/100" in note
+    assert "Communication" in note
+    assert "Full transcript: " in note and iv in note
