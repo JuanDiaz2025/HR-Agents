@@ -80,6 +80,43 @@ function buildBlob(bundlePath) {
   return blob;
 }
 
+/**
+ * Remove the Authenticode signature from a Windows binary.
+ *
+ * Injecting the SEA blob appends data after the signed region, which leaves the
+ * signature pointing at the wrong bytes. Windows and antivirus treat a malformed
+ * signature far worse than no signature at all - the file may refuse to launch.
+ * Node's own SEA docs say to strip it first with `signtool remove /s`, which is
+ * Windows-only, so we edit the PE header directly instead: clear the certificate
+ * table entry and drop the certificate data off the end.
+ */
+function stripAuthenticode(file) {
+  const buf = fs.readFileSync(file);
+  const pe = buf.readUInt32LE(0x3c);
+  if (buf.toString('ascii', pe, pe + 4) !== 'PE\0\0') throw new Error(`${file} is not a PE binary`);
+
+  const isPE32Plus = buf.readUInt16LE(pe + 24) === 0x20b;
+  const numDirs = buf.readUInt32LE(pe + 24 + (isPE32Plus ? 108 : 92));
+  if (numDirs < 5) return { stripped: false, reason: 'no certificate directory' };
+
+  const certEntry = pe + 24 + (isPE32Plus ? 112 : 96) + 4 * 8;
+  const certOffset = buf.readUInt32LE(certEntry);
+  const certSize = buf.readUInt32LE(certEntry + 4);
+  if (!certOffset || !certSize) return { stripped: false, reason: 'already unsigned' };
+
+  buf.writeUInt32LE(0, certEntry);
+  buf.writeUInt32LE(0, certEntry + 4);
+  // The checksum no longer matches. Windows only enforces it for drivers, and a
+  // zero reads as "not computed" rather than as a wrong value.
+  buf.writeUInt32LE(0, pe + 24 + 64);
+
+  // The certificate blob sits at the end of a pristine binary; anything after it
+  // would be appended data, which a freshly downloaded node.exe does not have.
+  const end = certOffset + certSize === buf.length ? certOffset : buf.length;
+  fs.writeFileSync(file, buf.subarray(0, end));
+  return { stripped: true, bytes: buf.length - end };
+}
+
 function download(url, dest) {
   return new Promise((resolve, reject) => {
     const request = (target, redirects = 0) => {
@@ -121,6 +158,13 @@ async function buildTarget(name, target, blob) {
 
   fs.copyFileSync(base, output);
   fs.chmodSync(output, 0o755);
+
+  if (name.startsWith('win')) {
+    const result = stripAuthenticode(output);
+    console.log(result.stripped
+      ? `   stripped the Authenticode signature (${result.bytes} bytes) before injecting`
+      : `   signature: ${result.reason}`);
+  }
 
   execFileSync(path.join(ROOT, 'node_modules', '.bin', 'postject'), [
     output, 'NODE_SEA_BLOB', blob,
