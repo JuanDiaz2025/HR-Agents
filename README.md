@@ -12,6 +12,20 @@ Real calls. Real scenarios. Real coaching.
                             report.html  <-  scorecard  <-  transcript
 ```
 
+## Hosting it instead (no download at all)
+
+`render.yaml` in this repo is a one-click deploy: connect the repo on
+render.com, set the credentials as environment variables, and the whole team
+gets a URL that works from any browser or phone. No install, no antivirus, and
+Twilio gets a permanent public address - so ngrok stops being needed.
+
+Two things the config already handles: `DASHBOARD_TOKEN` is generated
+automatically (mandatory once the app is public), and `data/` is mounted on a
+persistent disk so recordings and scorecards survive a redeploy.
+
+Set `PUBLIC_URL` to the Render URL after the first deploy, then re-run the
+Connections tab.
+
 ## Standalone executable
 
 `npm run build:exe` produces `dist/AI-Sales-Practice.exe` (Windows) and

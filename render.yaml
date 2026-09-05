@@ -1,0 +1,39 @@
+# One-click hosting on Render: nothing to install, nothing to download.
+# Everyone on the team gets a URL, and Twilio gets a stable public address so
+# ngrok is no longer needed at all.
+services:
+  - type: web
+    name: ai-sales-practice
+    runtime: node
+    plan: starter
+    buildCommand: npm install --omit=dev
+    startCommand: npm run serve
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.20.2
+      # Set these in the Render dashboard under Environment.
+      - key: DASHBOARD_TOKEN
+        generateValue: true
+      - key: PUBLIC_URL
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: SALES_LINE_NUMBER
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DATA_DIR
+        value: /var/data
+    # Recordings, transcripts and scorecards live on disk, so they need to
+    # survive a restart or every past call disappears on the next deploy.
+    disk:
+      name: practice-data
+      mountPath: /var/data
+      sizeGB: 5
