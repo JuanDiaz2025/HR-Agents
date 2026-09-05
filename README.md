@@ -75,6 +75,27 @@ Everything the dashboard shows is also available from the CLI, and vice versa -
 they share one code path, so starting a call from the web UI creates exactly the
 session `npm run call` would.
 
+## The connections, and how to know they work
+
+`npm run doctor` (or the **Connections** tab in the app) tests every service
+against the real API and tells you exactly what is broken and where to fix it.
+
+| Connection | Required for a call? | Where you get it |
+| --- | --- | --- |
+| **Twilio Account SID + Auth Token** | Yes | twilio.com/console, top of the dashboard |
+| **Twilio phone number** | Yes | Twilio Console - Phone Numbers - Active numbers. Must be voice-capable. The number the seller calls *from*. |
+| **Your sales line** | Yes | The number your reps answer. Not a Twilio number - your real line. |
+| **OpenAI API key** | Yes | platform.openai.com/api-keys. **Must have Realtime access** - gated separately from a normal key. |
+| **Public URL** | Yes | `ngrok http 3000`, paste the https URL. Twilio calls it back when the phone is answered. |
+| **Anthropic API key** | No | console.anthropic.com. OpenAI can do the scoring instead. |
+| **Dashboard password** | Only once public | Make one up, so nobody with the ngrok link can spend your call budget. |
+
+The checks are real requests, not format validation: Twilio confirms the account
+is live and that your number can actually make voice calls, OpenAI confirms a
+Realtime model is present on your account, and the public URL check calls this
+server's own `/health` endpoint through the tunnel - so a pass means Twilio can
+genuinely reach this process, not just that the URL is spelled right.
+
 ## What each phase needs from you
 
 Nothing here is a stub - every path is implemented. These are the accounts and

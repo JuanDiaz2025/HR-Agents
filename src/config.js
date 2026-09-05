@@ -23,7 +23,8 @@ function loadDotEnv() {
 }
 loadDotEnv();
 
-export const config = {
+function readConfig() {
+  return {
   port: Number(process.env.PORT || 3000),
   publicUrl: (process.env.PUBLIC_URL || '').replace(/\/$/, ''),
 
@@ -57,7 +58,22 @@ export const config = {
   dataDir: process.env.DATA_DIR || path.join(ROOT, 'data'),
   personaDir: path.join(ROOT, 'config', 'personas'),
   rubricPath: process.env.RUBRIC_PATH || path.join(ROOT, 'config', 'scoring-rubric.json'),
-};
+  };
+}
+
+export const config = readConfig();
+
+/**
+ * Re-read config from process.env in place. The Connections page writes new
+ * credentials and calls this, so a saved key takes effect on the next call
+ * without restarting the server mid-setup.
+ */
+export function refreshConfig() {
+  Object.assign(config, readConfig());
+  return config;
+}
+
+export const ENV_FILE = path.join(ROOT, '.env');
 
 export function readJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));

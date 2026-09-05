@@ -6,6 +6,7 @@ import { summarize, repBreakdown, loadScoredSessions } from './analytics.js';
 import { listPersonas, loadPersona } from './persona.js';
 import { loadRubric } from './score.js';
 import { capabilities } from './config.js';
+import { currentConnections, testAll, saveConnections } from './connections.js';
 
 const WEB_DIR = path.join(ROOT, 'src', 'web');
 
@@ -37,11 +38,13 @@ function tokenFrom(req, url) {
 }
 
 export function checkDashboardAccess(req, url) {
+  // Writes - saving credentials, placing a call - need either a correct token or
+  // a server that is not publicly reachable in the first place.
   if (!config.dashboardToken) {
-    return { allowed: true, canLaunchCalls: !config.publicUrl };
+    return { allowed: true, canWrite: !config.publicUrl };
   }
   const allowed = tokenFrom(req, url) === config.dashboardToken;
-  return { allowed, canLaunchCalls: allowed };
+  return { allowed, canWrite: allowed };
 }
 
 function readRequestJson(req) {
@@ -82,7 +85,7 @@ export async function handleApi(req, res, url, { onLaunchCall }) {
   const [, , resource, id, sub] = url.pathname.split('/');
 
   if (req.method === 'GET' && resource === 'summary') {
-    json(res, 200, { ...summarize(), capabilities: capabilities(), can_launch_calls: access.canLaunchCalls });
+    json(res, 200, { ...summarize(), capabilities: capabilities(), can_launch_calls: access.canWrite });
     return true;
   }
 
@@ -123,13 +126,38 @@ export async function handleApi(req, res, url, { onLaunchCall }) {
     return true;
   }
 
+  if (resource === 'connections' && req.method === 'GET') {
+    json(res, 200, { fields: currentConnections(), can_edit: access.canWrite, env_file_written: true });
+    return true;
+  }
+
+  if (resource === 'connections' && req.method === 'POST' && id === 'test') {
+    json(res, 200, await testAll());
+    return true;
+  }
+
+  if (resource === 'connections' && req.method === 'POST' && !id) {
+    if (!access.canWrite) {
+      json(res, 403, { error: 'Saving credentials from a public URL requires DASHBOARD_TOKEN. Set it in .env, restart, and open the dashboard with ?token=...' });
+      return true;
+    }
+    try {
+      const body = await readRequestJson(req);
+      const saved = saveConnections(body);
+      json(res, 200, { ...saved, connections: await testAll() });
+    } catch (err) {
+      json(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
   if (req.method === 'GET' && resource === 'rubric') {
     json(res, 200, loadRubric());
     return true;
   }
 
   if (req.method === 'POST' && resource === 'calls') {
-    if (!access.canLaunchCalls) {
+    if (!access.canWrite) {
       json(res, 403, {
         error: 'Launching calls from a public URL requires DASHBOARD_TOKEN to be set. Set it in .env and reload with ?token=...',
       });

@@ -322,7 +322,7 @@ async function viewLaunch() {
   if (!summary.capabilities.live_calls) {
     notice = `<div class="banner"><b>Live calls are not configured yet</b>
       Add your Twilio credentials, an OpenAI key with Realtime access, and a public <code>PUBLIC_URL</code> to <code>.env</code>.
-      The <a href="#/setup">Setup tab</a> lists exactly what is missing.</div>`;
+      The <a href="#/connections">Connections tab</a> lists exactly what is missing.</div>`;
   } else if (!summary.can_launch_calls) {
     notice = `<div class="banner bad"><b>Launching calls is disabled</b>
       This dashboard is reachable at a public URL with no <code>DASHBOARD_TOKEN</code> set, so anyone with the link could
@@ -382,39 +382,103 @@ async function viewLaunch() {
   };
 }
 
-async function viewSetup() {
-  const summary = await api('summary');
-  const c = summary.capabilities;
+const STATUS_STYLE = {
+  ok: { role: 'good', label: 'Working' },
+  warning: { role: 'warning', label: 'Check this' },
+  error: { role: 'critical', label: 'Not working' },
+  not_set: { role: 'muted', label: 'Not set' },
+};
 
-  const rows = [
-    ['Mine real calls', c.mining && c.transcription, 'OPENAI_API_KEY, plus recordings in a folder'],
-    ['Transcribe recordings', c.transcription, 'OPENAI_API_KEY'],
-    ['LLM scoring and coaching', c.llm_scoring, 'ANTHROPIC_API_KEY or OPENAI_API_KEY'],
-    ['Live phone calls', c.live_calls, 'TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, SALES_LINE_NUMBER, PUBLIC_URL, OPENAI_API_KEY'],
-    ['Offline scoring and reports', c.offline_scoring, 'nothing - always available'],
-  ].map(([label, ok, needs]) => `<tr>
-      <td>${esc(label)}</td>
-      <td style="width:120px"><span class="pill"><span class="dot dot-${ok ? 'good' : 'critical'}"></span>${ok ? 'Ready' : 'Missing'}</span></td>
-      <td class="small muted">${ok ? '' : `needs ${esc(needs)}`}</td>
-    </tr>`).join('');
+function connectionRow(key, r) {
+  const st = STATUS_STYLE[r.status] || STATUS_STYLE.not_set;
+  return `<tr>
+    <td style="width:190px"><b>${esc(r.name)}</b><div class="small muted">${esc(r.purpose)}</div></td>
+    <td style="width:130px"><span class="pill"><span class="dot dot-${st.role}"></span>${st.label}</span></td>
+    <td class="small">${esc(r.detail || '')}${r.fix ? `<div class="muted" style="margin-top:3px">${esc(r.fix)}</div>` : ''}</td>
+  </tr>`;
+}
+
+async function viewConnections() {
+  const [{ fields, can_edit }, tested] = await Promise.all([api('connections'), api('connections/test', { method: 'POST' }).catch((e) => ({ error: e.message }))]);
+
+  const inputs = fields.map((f) => `<div class="field">
+      <label for="f-${esc(f.key)}">${esc(f.label)}</label>
+      <input id="f-${esc(f.key)}" name="${esc(f.key)}" type="${f.secret ? 'password' : 'text'}"
+        placeholder="${esc(f.set ? f.display : (f.placeholder || ''))}" autocomplete="off" spellcheck="false">
+      <p class="small muted" style="margin:5px 0 0">${esc(f.where)}</p>
+    </div>`).join('');
+
+  const status = tested.error
+    ? `<div class="banner bad"><b>Could not test the connections</b>${esc(tested.error)}</div>`
+    : `<div class="card">
+        <h2>Connection status</h2>
+        <table><tbody>${Object.entries(tested.results).map(([k, r]) => connectionRow(k, r)).join('')}</tbody></table>
+        <div style="margin-top:16px">${tested.ready_to_call
+          ? `<div class="banner good"><b>Ready to place a real call</b>Everything a call needs is connected and answering.
+              <a href="#/launch">Start a practice call</a>.</div>`
+          : `<div class="banner"><b>Not ready to call yet</b>Still needed: ${esc(tested.blocking.join(', '))}.
+              Fill those in below and press Save &amp; test &mdash; each one is checked against the real service.</div>`}
+        </div>
+        <button class="ghost" id="retest" style="margin-top:4px">Test again</button>
+      </div>`;
 
   return {
-    html: `<h1>Setup</h1>
-      <p class="sub">What is wired up right now. Same check as <code>npm run doctor</code>.</p>
-      <div class="card"><table><tbody>${rows}</tbody></table></div>
-      <div class="card"><h2>Getting live calls working</h2>
-        <ol style="margin:0;padding-left:20px" class="small">
-          <li style="margin-bottom:8px">Copy <code>.env.example</code> to <code>.env</code>.</li>
-          <li style="margin-bottom:8px">Add your Twilio SID, auth token and number, and an OpenAI key <b>with Realtime access enabled</b> &mdash;
-            that is gated separately from a normal key and is the most common thing to block a first call.</li>
-          <li style="margin-bottom:8px">Run <code>ngrok http 3000</code> and paste the https URL into <code>PUBLIC_URL</code>.</li>
-          <li style="margin-bottom:8px">Set a <code>DASHBOARD_TOKEN</code> so the public URL cannot be used by a stranger to spend your call budget.</li>
-          <li>Restart the server and reload this page.</li>
-        </ol></div>
-      <div class="card"><h2>Editing the standard</h2>
-        <p class="small" style="margin:0"><code>config/scoring-rubric.json</code> is the sales standard &mdash; the categories, their weights,
-        and the auto-fails. Nothing is hardcoded elsewhere, so editing that file and re-running
-        <code>npm run score -- &lt;session&gt;</code> re-grades a past call against the new standard.</p></div>`,
+    html: `
+      <h1>Connections</h1>
+      <p class="sub">Six outside services. Four of them are required before a phone can ring.
+        Every check below makes a real request &mdash; "filled in" and "working" are not the same thing.</p>
+      ${status}
+      <div class="card" style="max-width:640px">
+        <h2>Credentials</h2>
+        ${can_edit ? '' : `<div class="banner bad"><b>Read only</b>This dashboard is on a public URL without a password, so credentials cannot be edited here. Set <code>DASHBOARD_TOKEN</code> in <code>.env</code>, or edit <code>.env</code> directly.</div>`}
+        <p class="small muted" style="margin:-4px 0 16px">Saved to <code>.env</code> on this machine, never sent anywhere else.
+          Leave a field blank to keep what is already there.</p>
+        <form id="conn-form">${inputs}
+          <button type="submit" ${can_edit ? '' : 'disabled'}>Save &amp; test</button>
+        </form>
+        <div id="conn-result" style="margin-top:16px"></div>
+      </div>
+
+      <div class="card"><h2>What each one costs</h2>
+        <table>
+          <thead><tr><th>Service</th><th>What it does</th><th class="num">Rough cost</th></tr></thead>
+          <tbody>
+            <tr><td>Twilio</td><td class="small">Places the call, records it</td><td class="num small">~$1/mo + ~1.3&cent;/min</td></tr>
+            <tr><td>OpenAI</td><td class="small">The seller's voice, and transcription</td><td class="num small">~$2-4 per 10-min call</td></tr>
+            <tr><td>Anthropic</td><td class="small">Scoring and coaching</td><td class="num small">pennies per call</td></tr>
+            <tr><td>ngrok</td><td class="small">Public URL while testing</td><td class="num small">free</td></tr>
+          </tbody>
+        </table>
+        <p class="small muted" style="margin:14px 0 0">Voice minutes are almost the entire bill. Verify current pricing on each provider's page &mdash; these are estimates.</p>
+      </div>`,
+    after(root) {
+      root.querySelector('#retest')?.addEventListener('click', () => render());
+
+      const form = root.querySelector('#conn-form');
+      const result = root.querySelector('#conn-result');
+      form?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const button = form.querySelector('button');
+        button.disabled = true;
+        button.textContent = 'Saving and testing...';
+        try {
+          const body = Object.fromEntries([...new FormData(form)].filter(([, v]) => String(v).trim()));
+          if (!Object.keys(body).length) throw new Error('Nothing to save - fill in at least one field.');
+          const r = await api('connections', { method: 'POST', body: JSON.stringify(body) });
+          result.innerHTML = `<div class="banner good"><b>Saved ${r.saved.length} credential${r.saved.length === 1 ? '' : 's'}</b>
+            ${r.connections.ready_to_call
+              ? 'Everything a call needs is now connected. <a href="#/launch">Start a practice call</a>.'
+              : `Still needed: ${esc(r.connections.blocking.join(', '))}.`}</div>`;
+          form.reset();
+          setTimeout(render, 1200);
+        } catch (err) {
+          result.innerHTML = `<div class="banner bad"><b>Could not save</b>${esc(err.message)}</div>`;
+        } finally {
+          button.disabled = false;
+          button.textContent = 'Save & test';
+        }
+      });
+    },
   };
 }
 
@@ -427,7 +491,7 @@ const routes = [
   [/^sessions\/(.+)$/, viewSession],
   [/^personas$/, viewPersonas],
   [/^launch$/, viewLaunch],
-  [/^setup$/, viewSetup],
+  [/^connections$/, viewConnections],
 ];
 
 async function render() {

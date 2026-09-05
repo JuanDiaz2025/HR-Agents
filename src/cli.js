@@ -30,7 +30,7 @@ const USAGE = `AI Sales Practice & Testing System
 
   npm run demo                      Run the whole loop on a sample call - no credentials needed
   npm run demo -- --seed 12         Fill the dashboard with sample calls to click through
-  npm run doctor                    Show which phases are wired up and what is missing
+  npm run doctor                    Test every connection against the real service
 
   npm run mine -- <dir>             Phase 2: transcribe and analyze real recorded calls
     --apply-to <persona>              also fold the findings into a persona
@@ -50,24 +50,31 @@ const USAGE = `AI Sales Practice & Testing System
 `;
 
 async function cmdDoctor() {
-  const caps = capabilities();
-  console.log('Capability check\n');
-  const rows = [
-    ['Mine real calls (transcribe + analyze)', caps.transcription, 'OPENAI_API_KEY'],
-    ['AI seller persona + instructions', true, '-'],
-    ['Typed practice (simulate)', caps.llm_scoring, 'ANTHROPIC_API_KEY or OPENAI_API_KEY'],
-    ['Live phone call (AI seller dials your line)', caps.live_calls, 'TWILIO_* + OPENAI_API_KEY + PUBLIC_URL + SALES_LINE_NUMBER'],
-    ['Transcribe a recording', caps.transcription, 'OPENAI_API_KEY'],
-    ['LLM scoring + coaching', caps.llm_scoring, 'ANTHROPIC_API_KEY or OPENAI_API_KEY'],
-    ['Offline scoring + report', true, '-'],
-  ];
-  for (const [label, ok, needs] of rows) {
-    console.log(`  ${ok ? '[ready]  ' : '[missing]'} ${label.padEnd(44)} ${ok ? '' : 'needs ' + needs}`);
+  const { testAll, FIELDS } = await import('./connections.js');
+  console.log('Testing every connection against the real service...\n');
+  const { results, ready_to_call, blocking } = await testAll();
+
+  const mark = { ok: '[ok]     ', warning: '[check]  ', error: '[FAILED] ', not_set: '[not set]' };
+  for (const r of Object.values(results)) {
+    console.log(`  ${mark[r.status]} ${r.name.padEnd(20)} ${r.detail}`);
+    if (r.fix) console.log(`${' '.repeat(33)}-> ${r.fix}`);
+  }
+
+  console.log('');
+  if (ready_to_call) {
+    console.log('Ready to place a real call:  npm run call -- --rep "your name"');
+  } else {
+    console.log(`Not ready to call. Still needed: ${blocking.join(', ')}`);
+    console.log('\nWhere each value comes from:');
+    for (const f of FIELDS) {
+      if (process.env[f.key]) continue;
+      console.log(`  ${f.key}`);
+      console.log(`    ${f.where}`);
+    }
+    console.log('\nPut them in .env, or use the Connections tab: npm run serve');
   }
   console.log(`\nScoring provider: ${activeProvider() || 'none (offline heuristics only)'}`);
   console.log(`Personas: ${listPersonas().join(', ') || '(none)'}`);
-  console.log(`Data dir: ${config.dataDir}`);
-  if (!fs.existsSync(path.join(ROOT, '.env'))) console.log('\nNo .env yet. Copy .env.example to .env and fill in what you have.');
 }
 
 async function cmdDemo(flags = {}) {
