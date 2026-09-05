@@ -7,6 +7,7 @@ import { listPersonas, loadPersona } from './persona.js';
 import { loadRubric } from './score.js';
 import { capabilities } from './config.js';
 import { currentConnections, testAll, saveConnections } from './connections.js';
+import { isPackaged } from './resources.js';
 
 const WEB_DIR = path.join(ROOT, 'src', 'web');
 
@@ -85,7 +86,7 @@ export async function handleApi(req, res, url, { onLaunchCall }) {
   const [, , resource, id, sub] = url.pathname.split('/');
 
   if (req.method === 'GET' && resource === 'summary') {
-    json(res, 200, { ...summarize(), capabilities: capabilities(), can_launch_calls: access.canWrite });
+    json(res, 200, { ...summarize(), capabilities: capabilities(), can_launch_calls: access.canWrite, packaged: isPackaged });
     return true;
   }
 

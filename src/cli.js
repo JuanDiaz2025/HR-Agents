@@ -84,9 +84,12 @@ async function cmdDemo(flags = {}) {
     console.log(`Seeding ${count} sample practice calls so the dashboard has something to show...\n`);
     const created = await seedSessions(count);
     for (const c of created) console.log(`  ${c.rep.padEnd(8)} ${String(c.score).padStart(3)}/100  ${c.difficulty.padEnd(6)} (${c.improvements} coached behaviors)`);
+    const { isPackaged } = await import('./resources.js');
+    // PowerShell will not run a bare basename from the current directory.
+    const startCommand = isPackaged ? `.${path.sep}${path.basename(process.execPath)}` : 'npm run serve';
     console.log(`\nSeeded ${created.length} sessions. Scores come from the real scorer on real transcripts.`);
-    console.log(`Start the dashboard:  npm run serve   ->  http://localhost:3000`);
-    console.log(`Clear the sample data: rm -rf data/`);
+    console.log(`Start the dashboard:  ${startCommand}   ->  http://localhost:${config.port}`);
+    console.log(`Clear the sample data: delete the data folder`);
     return;
   }
   return cmdDemoSingle();
@@ -110,7 +113,7 @@ async function cmdDemoSingle() {
   console.log(`3. report      -> ${files.html}`);
   console.log(`\nTop opportunities:`);
   for (const o of scorecard.top_opportunities) console.log(`   ${o.rank}. ${o.title} - ${o.why}`);
-  console.log(`\nOpen the report:  open ${files.html}`);
+  console.log(`\nOpen the report:  ${files.html}`);
 }
 
 async function cmdMine(positional, flags) {
