@@ -16,8 +16,16 @@ Real calls. Real scenarios. Real coaching.
 
 ```bash
 npm install
-npm run demo      # runs the whole loop on a sample call - no credentials needed
-npm run doctor    # shows which phases are live and what each missing one needs
+npm run demo -- --seed 12   # fill it with sample calls so there is something to look at
+npm run serve               # then open http://localhost:3000
+```
+
+No credentials, no build step, no database. `rm -rf data/` clears the sample
+data whenever you want.
+
+```bash
+npm run demo      # the loop on a single sample call, printed to the terminal
+npm run doctor    # which phases are live, and what each missing one needs
 ```
 
 `npm run demo` writes a real scorecard and a real `report.html` to
@@ -26,6 +34,26 @@ see the output before you spend a dollar on telephony.
 
 The hour-by-hour version, with exit criteria for each phase, is in
 [`docs/DAY1-RUNBOOK.md`](docs/DAY1-RUNBOOK.md).
+
+## The dashboard
+
+`npm run serve` starts the web app at `http://localhost:3000`:
+
+- **Dashboard** - team average, pass rate, and the categories costing the most
+  weighted points per call
+- **Reps** - score per call over time, whether each rep is improving, and the
+  category costing them the most
+- **Calls** - every session, click through to the scorecard and full report
+- **Sellers** - the personas and how much each one holds back
+- **Start a call** - launch a practice call: pick the rep, the seller and the
+  difficulty
+- **Setup** - the same capability check as `npm run doctor`
+
+**One security note.** Once `PUBLIC_URL` is set, the dashboard is reachable by
+anyone with that link. Set `DASHBOARD_TOKEN` in `.env` and open the dashboard
+with `?token=...`. Until you do, starting calls from the web UI is refused
+outright - otherwise a stranger who found the ngrok URL could spend your call
+budget. Twilio's own webhooks are never behind that check, so calls keep working.
 
 ## The seven phases, and the command for each
 
@@ -38,6 +66,10 @@ The hour-by-hour version, with exit criteria for each phase, is in
 | 5. Evaluate & score | Transcribe, grade against the rubric, write the coaching report | automatic after a call, or `npm run score -- <session>` |
 | 6. Refine & retest | Change difficulty, re-run, compare | `npm run call -- --difficulty hard` |
 | 7. Deliver | Reports as HTML and Markdown, one folder per session | `data/sessions/<id>/report.html` |
+
+Everything the dashboard shows is also available from the CLI, and vice versa -
+they share one code path, so starting a call from the web UI creates exactly the
+session `npm run call` would.
 
 ## What each phase needs from you
 
@@ -97,6 +129,11 @@ labels, scores it, and writes the report - no further commands.
 ```
 src/
   cli.js              every command
+  web/                the dashboard - plain HTML, CSS and JS, no build step
+  web-routes.js       the dashboard's JSON API and static file serving
+  analytics.js        rolls session folders up into team and per-rep numbers
+  launch-call.js      the one code path that places a call (CLI and web share it)
+  seed.js             sample sessions so the dashboard has something to show
   server.js           Twilio webhooks + the media-stream upgrade
   realtime-bridge.js  Twilio audio <-> OpenAI Realtime, both directions
   persona.js          persona JSON -> voice instructions

@@ -8,6 +8,8 @@ import * as store from './store.js';
 import { transcribeAudio } from './transcribe.js';
 import { scoreTranscript } from './score.js';
 import { renderReport } from './report.js';
+import { handleApi, serveStatic, checkDashboardAccess } from './web-routes.js';
+import { launchCall } from './launch-call.js';
 
 function readBody(req) {
   return new Promise((resolve) => {
@@ -56,6 +58,10 @@ async function handleRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const [, route, sessionId] = url.pathname.split('/');
 
+  // Dashboard first: its API, then its static files. Twilio's webhook routes are
+  // matched below and never pass through the dashboard's access check.
+  if (await handleApi(req, res, url, { onLaunchCall: launchCall })) return;
+
   if (url.pathname === '/health') {
     return send(res, 200, JSON.stringify({ ok: true, capabilities: capabilities() }), 'application/json');
   }
@@ -65,9 +71,16 @@ async function handleRequest(req, res) {
   }
 
   if (route === 'report' && req.method === 'GET' && sessionId) {
+    if (!checkDashboardAccess(req, url).allowed) return send(res, 401, 'This dashboard is password protected');
     const html = store.readArtifact(sessionId, 'report.html');
     if (!html) return send(res, 404, 'No report for that session yet');
     return send(res, 200, html, 'text/html');
+  }
+
+  if (req.method === 'GET') {
+    if (!checkDashboardAccess(req, url).allowed) return send(res, 401, 'This dashboard is password protected. Open it with ?token=...');
+    if (serveStatic(req, res, url)) return;
+    return send(res, 404, 'Not found');
   }
 
   if (req.method !== 'POST') return send(res, 404, 'Not found');
@@ -181,10 +194,15 @@ export function startServer(port = config.port) {
   const server = createServer();
   server.listen(port, () => {
     console.log(`AI Sales Practice server listening on :${port}`);
+    console.log(`  dashboard:  http://localhost:${port}${config.dashboardToken ? '?token=...' : ''}`);
     console.log(`  public url: ${config.publicUrl || '(PUBLIC_URL not set - Twilio cannot reach this yet)'}`);
     for (const [name, ok] of Object.entries(capabilities())) console.log(`  ${ok ? '[ready]  ' : '[missing]'} ${name}`);
     if (config.publicUrl && !config.twilio.authToken) {
       console.warn('  WARNING: TWILIO_AUTH_TOKEN is unset, so webhook signatures are not being verified.');
+    }
+    if (config.publicUrl && !config.dashboardToken) {
+      console.warn('  WARNING: PUBLIC_URL is set with no DASHBOARD_TOKEN - the dashboard is readable by anyone with the link,');
+      console.warn('           and launching calls from it is disabled until you set one.');
     }
   });
   return server;

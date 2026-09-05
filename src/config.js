@@ -51,6 +51,9 @@ export const config = {
   /** The sales line the AI seller dials - i.e. the number your reps answer. */
   salesLine: process.env.SALES_LINE_NUMBER || '',
 
+  /** Optional shared password for the dashboard. Required to launch calls once PUBLIC_URL is set. */
+  dashboardToken: process.env.DASHBOARD_TOKEN || '',
+
   dataDir: process.env.DATA_DIR || path.join(ROOT, 'data'),
   personaDir: path.join(ROOT, 'config', 'personas'),
   rubricPath: process.env.RUBRIC_PATH || path.join(ROOT, 'config', 'scoring-rubric.json'),

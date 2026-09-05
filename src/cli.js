@@ -29,6 +29,7 @@ function parseFlags(argv) {
 const USAGE = `AI Sales Practice & Testing System
 
   npm run demo                      Run the whole loop on a sample call - no credentials needed
+  npm run demo -- --seed 12         Fill the dashboard with sample calls to click through
   npm run doctor                    Show which phases are wired up and what is missing
 
   npm run mine -- <dir>             Phase 2: transcribe and analyze real recorded calls
@@ -69,7 +70,22 @@ async function cmdDoctor() {
   if (!fs.existsSync(path.join(ROOT, '.env'))) console.log('\nNo .env yet. Copy .env.example to .env and fill in what you have.');
 }
 
-async function cmdDemo() {
+async function cmdDemo(flags = {}) {
+  if (flags.seed) {
+    const count = flags.seed === true ? 12 : Number(flags.seed);
+    const { seedSessions } = await import('./seed.js');
+    console.log(`Seeding ${count} sample practice calls so the dashboard has something to show...\n`);
+    const created = await seedSessions(count);
+    for (const c of created) console.log(`  ${c.rep.padEnd(8)} ${String(c.score).padStart(3)}/100  ${c.difficulty.padEnd(6)} (${c.improvements} coached behaviors)`);
+    console.log(`\nSeeded ${created.length} sessions. Scores come from the real scorer on real transcripts.`);
+    console.log(`Start the dashboard:  npm run serve   ->  http://localhost:3000`);
+    console.log(`Clear the sample data: rm -rf data/`);
+    return;
+  }
+  return cmdDemoSingle();
+}
+
+async function cmdDemoSingle() {
   console.log('Running the full loop on the sample call (no credentials required)\n');
   const sample = JSON.parse(fs.readFileSync(path.join(ROOT, 'samples', 'sample-practice-call.json'), 'utf8'));
   const session = store.createSession({ id: store.newSessionId('demo'), persona: 'larry', rep: 'Marcus (sample)', difficulty: 'medium', status: 'transcribed', duration_seconds: 249 });
@@ -164,26 +180,19 @@ async function cmdCall(flags) {
     process.exitCode = 1;
     return;
   }
-  const { placeCall } = await import('./twilio.js');
-  const to = flags.to || config.salesLine;
-  const persona = loadPersona(flags.persona || 'larry');
-  const session = store.createSession({
-    id: store.newSessionId('call'),
-    persona: persona.id,
-    difficulty: flags.difficulty || persona.difficulty,
-    rep: flags.rep || null,
-    to,
-    from: config.twilio.fromNumber,
-    status: 'dialing',
+  const { launchCall } = await import('./launch-call.js');
+  const result = await launchCall({
+    to: flags.to,
+    persona: flags.persona || 'larry',
+    difficulty: flags.difficulty,
+    rep: flags.rep,
   });
 
-  const call = await placeCall({ to, from: config.twilio.fromNumber, sessionId: session.id });
-  store.updateSession(session.id, { call_sid: call.sid, call_status: call.status });
-  console.log(`Calling ${to} as ${persona.name} (${session.difficulty}).`);
-  console.log(`  session: ${session.id}`);
-  console.log(`  call:    ${call.sid} (${call.status})`);
+  console.log(`Calling ${result.to} as ${result.persona} (${result.difficulty}).`);
+  console.log(`  session: ${result.session_id}`);
+  console.log(`  call:    ${result.call_sid} (${result.status})`);
   console.log(`\nAnswer the phone. When the call ends the server transcribes, scores and writes the report automatically.`);
-  console.log(`Then: npm run report -- ${session.id}`);
+  console.log(`Then: npm run report -- ${result.session_id}`);
 }
 
 async function main() {
@@ -191,7 +200,7 @@ async function main() {
   const { flags, positional } = parseFlags(rest);
 
   switch (command) {
-    case 'demo': return cmdDemo();
+    case 'demo': return cmdDemo(flags);
     case 'doctor': return cmdDoctor();
     case 'mine': return cmdMine(positional, flags);
     case 'persona': return cmdPersona(positional, flags);

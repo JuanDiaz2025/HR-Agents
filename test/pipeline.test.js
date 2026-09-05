@@ -84,6 +84,28 @@ test('the sample call is graded on the gaps it actually has', () => {
   assert.ok(scorecard.top_opportunities.some((o) => o.title === 'Decision Makers'));
 });
 
+test('a category scoring full marks is never listed as an opportunity', () => {
+  const scorecard = scoreOffline(sample, loadRubric());
+  const perfect = scorecard.categories.filter((c) => c.score >= 90).map((c) => c.name);
+  assert.ok(perfect.length, 'sample should score full marks somewhere');
+  for (const o of scorecard.top_opportunities) {
+    assert.ok(!perfect.includes(o.title), `"${o.title}" scored >= 90 but was listed as an opportunity`);
+    assert.match(o.why, /No evidence|Rep talked|Fewer than/, `opportunity "${o.title}" is not phrased as a gap`);
+  }
+});
+
+test('opportunities are ranked by weighted points lost, not raw score', () => {
+  const scorecard = scoreOffline(sample, loadRubric());
+  const cost = (title) => {
+    const c = scorecard.categories.find((x) => x.name === title);
+    return (100 - c.score) * c.weight;
+  };
+  const costs = scorecard.top_opportunities.map((o) => cost(o.title));
+  for (let i = 1; i < costs.length; i++) {
+    assert.ok(costs[i - 1] >= costs[i], `opportunity ${i} costs more than the one ranked above it`);
+  }
+});
+
 test('auto-fail fires when the call ends with no next step', () => {
   const noNextStep = {
     turns: [

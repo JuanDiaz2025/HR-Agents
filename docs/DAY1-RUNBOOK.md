@@ -13,9 +13,14 @@ Owners: Jonathan (setup), Seth (infrastructure)
 git clone <this repo> && cd HR-Agents
 npm install
 cp .env.example .env
-npm run doctor          # everything will read "missing" - that is the checklist
-npm run demo            # proves the scoring and reporting half works right now
+npm run doctor              # everything will read "missing" - that is the checklist
+npm run demo -- --seed 12   # sample calls so the dashboard is not empty
+npm run serve               # open http://localhost:3000
 ```
+
+Leave the dashboard open in a browser tab for the rest of the day - every phase
+below shows up in it as it happens. Clear the sample data with `rm -rf data/`
+before your first real call so the numbers are yours.
 
 Accounts to have open by 9:00:
 
@@ -28,8 +33,8 @@ Accounts to have open by 9:00:
 Fill those into `.env`. Re-run `npm run doctor` until the rows you need read
 `[ready]`.
 
-**Exit criteria:** `npm run demo` produces a report, and `doctor` shows what is
-still missing.
+**Exit criteria:** the dashboard loads with sample data, and `doctor` shows what
+is still missing.
 
 ---
 
@@ -102,11 +107,15 @@ ngrok http 3000            # copy the https URL into PUBLIC_URL in .env
 npm run serve
 ```
 
-Terminal 2:
+Terminal 2 - or just use the **Start a call** tab in the dashboard:
 
 ```bash
 npm run call -- --to +14155550134 --rep "Marcus" --difficulty medium
 ```
+
+Set `DASHBOARD_TOKEN` in `.env` before you do this over ngrok. Without it the web
+UI refuses to start calls, because anyone with the link could otherwise spend
+your call budget.
 
 The sales line rings. Answer it and work the call like a real lead.
 
@@ -194,7 +203,12 @@ git add -A && git commit -m "Day 1: working practice loop with tuned persona and
 - **Regular practice schedule.** `npm run call` is a single command - put it on a
   cron with a rep name and a rotating persona, two or three calls per rep per week.
 - **Unannounced tests.** The same command, unscheduled, into the normal queue.
-- **Rep trends.** Every session is a folder with a JSON scorecard. Aggregating
-  score-by-category over time per rep is a reporting job on data you already have.
+- **Rep trends.** Already in the dashboard's Reps tab. What is not there yet is
+  history beyond what fits on one machine - see below.
+- **A real database.** Sessions live in `data/` on whichever machine ran the
+  call. Once more than one person needs the dashboard, move `src/store.js` to
+  Postgres (Supabase or Neon) and host the server somewhere always-on - Render,
+  Railway or Fly. Not Vercel: Twilio's media stream holds a WebSocket open for
+  the whole call, and serverless functions cannot.
 - **Text and email scenarios.** `buildInstructions()` is channel-agnostic - the
   persona already works for a non-voice channel.

@@ -78,6 +78,10 @@ export function scoreOffline(transcript, rubric) {
     let score;
     const evidence = [];
     const missed = [];
+    // How this category's shortfall should be phrased as a coaching note. The
+    // control category measures behavior directly, so its misses are already
+    // full sentences; the others are unmet criteria and need framing.
+    let gapReason = null;
 
     if (cat.id === 'control') {
       const talkScore = stats.rep_talk_pct <= 45 ? 100 : Math.max(0, 100 - (stats.rep_talk_pct - 45) * 3);
@@ -87,6 +91,7 @@ export function scoreOffline(transcript, rubric) {
       evidence.push(`${stats.question_count} questions asked (target: 8+)`);
       if (stats.rep_talk_pct > 45) missed.push('Rep talked more than the target share of the call');
       if (stats.question_count < 8) missed.push('Fewer than 8 questions asked');
+      gapReason = missed[0] || null;
     } else {
       const hits = (cat.signals || []).filter((s) => repText.includes(s));
       const target = Math.min((cat.signals || []).length, 3) || 1;
@@ -97,14 +102,19 @@ export function scoreOffline(transcript, rubric) {
       }
       if (!hits.length) missed.push(...(cat.criteria || []).slice(0, 2));
       else if (hits.length < target) missed.push(...(cat.criteria || []).slice(hits.length, hits.length + 1));
+      gapReason = missed[0] ? `No evidence in the transcript of: ${missed[0].toLowerCase()}` : null;
     }
 
-    return { id: cat.id, name: cat.name, weight: cat.weight, score, weighted: +(score * cat.weight * factor / 100).toFixed(1), evidence, missed };
+    return { id: cat.id, name: cat.name, weight: cat.weight, score, weighted: +(score * cat.weight * factor / 100).toFixed(1), evidence, missed, gap_reason: gapReason };
   });
 
   const overall = Math.round(categories.reduce((n, c) => n + c.weighted, 0));
   const autoFails = detectAutoFails(transcript, stats);
-  const ranked = [...categories].sort((a, b) => (a.score * a.weight) - (b.score * b.weight));
+  // Only categories with an actual shortfall can be an opportunity - a 100/100
+  // category is not something to work on. Ranked by weighted points lost.
+  const ranked = categories
+    .filter((c) => c.score < 90)
+    .sort((a, b) => ((100 - b.score) * b.weight) - ((100 - a.score) * a.weight));
 
   return {
     session_id: transcript.session_id || null,
@@ -121,10 +131,12 @@ export function scoreOffline(transcript, rubric) {
     top_opportunities: ranked.slice(0, 4).map((c, i) => ({
       rank: i + 1,
       title: c.name,
-      why: c.missed[0] || `Scored ${c.score}/100 on a ${c.weight}-point category`,
+      why: c.gap_reason || `Scored ${c.score}/100 on a ${c.weight}-point category`,
       say_this_instead: null,
     })),
-    next_call_focus: ranked[0] ? `Focus the next practice call on ${ranked[0].name}.` : '',
+    next_call_focus: ranked[0]
+      ? `Focus the next practice call on ${ranked[0].name} - it is costing ${(+((100 - ranked[0].score) * ranked[0].weight * factor / 100).toFixed(1))} points a call.`
+      : 'No category scored below 90. Raise the difficulty or tighten the rubric.',
   };
 }
 
