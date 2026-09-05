@@ -49,6 +49,10 @@ The hour-by-hour version, with exit criteria for each phase, is in
   difficulty
 - **Setup** - the same capability check as `npm run doctor`
 
+**Sharing a read-only view.** `npm run snapshot` writes `dist/dashboard.html` -
+the whole dashboard with the current data inlined as a single file. No server,
+no API calls. Email it, drop it in Drive, open it on a phone.
+
 **One security note.** Once `PUBLIC_URL` is set, the dashboard is reachable by
 anyone with that link. Set `DASHBOARD_TOKEN` in `.env` and open the dashboard
 with `?token=...`. Until you do, starting calls from the web UI is refused
@@ -134,6 +138,8 @@ src/
   analytics.js        rolls session folders up into team and per-rep numbers
   launch-call.js      the one code path that places a call (CLI and web share it)
   seed.js             sample sessions so the dashboard has something to show
+scripts/
+  build-snapshot.js   exports the dashboard as one shareable HTML file
   server.js           Twilio webhooks + the media-stream upgrade
   realtime-bridge.js  Twilio audio <-> OpenAI Realtime, both directions
   persona.js          persona JSON -> voice instructions

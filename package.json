@@ -4,8 +4,12 @@
   "private": true,
   "type": "module",
   "description": "AI Sales Practice & Testing System - an AI seller persona calls your sales line, the call is recorded, transcribed, scored against your sales standard, and turned into a coaching report.",
-  "engines": { "node": ">=20" },
-  "bin": { "practice": "./src/cli.js" },
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "practice": "./src/cli.js"
+  },
   "scripts": {
     "demo": "node src/cli.js demo",
     "serve": "node src/cli.js serve",
@@ -15,7 +19,8 @@
     "score": "node src/cli.js score",
     "report": "node src/cli.js report",
     "doctor": "node src/cli.js doctor",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "snapshot": "node scripts/build-snapshot.js"
   },
   "dependencies": {
     "ws": "^8.18.0"
