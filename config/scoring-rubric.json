@@ -1,0 +1,187 @@
+{
+  "id": "thb-seller-call-v1",
+  "name": "Twin Home Buyer - Inbound Seller Call Standard",
+  "version": 1,
+  "passing_score": 75,
+  "categories": [
+    {
+      "id": "opening",
+      "name": "Opening & Rapport",
+      "weight": 8,
+      "what_good_looks_like": "Rep identifies themselves and the company, thanks the seller for calling, and spends the first 60-90 seconds listening rather than pitching.",
+      "criteria": [
+        "Introduced self and Twin Home Buyer by name",
+        "Asked an open question before offering anything",
+        "Let the seller finish without interrupting"
+      ],
+      "signals": [
+        "this is",
+        "thanks for calling",
+        "tell me about",
+        "how can i help",
+        "what's going on with"
+      ]
+    },
+    {
+      "id": "motivation",
+      "name": "Motivation Discovery",
+      "weight": 20,
+      "what_good_looks_like": "Rep uncovers WHY the seller is selling and what happens if they do nothing. At least three motivation questions, including one follow-up that goes a layer deeper.",
+      "criteria": [
+        "Asked why the seller is considering selling",
+        "Asked at least one follow-up that goes deeper than the first answer",
+        "Uncovered the real pain (burden, distance, cost, family pressure)",
+        "Asked what happens if they don't sell"
+      ],
+      "signals": [
+        "why",
+        "what made you",
+        "what's driving",
+        "what would happen if",
+        "how long have you",
+        "walk me through"
+      ]
+    },
+    {
+      "id": "property",
+      "name": "Property & Condition",
+      "weight": 12,
+      "what_good_looks_like": "Rep gets enough condition detail to underwrite: beds/baths, square footage, roof, systems, kitchen/bath, and anything deferred.",
+      "criteria": [
+        "Asked beds / baths / square footage",
+        "Asked about condition and needed repairs",
+        "Asked about roof, HVAC, plumbing, or electrical specifically",
+        "Asked about occupancy (vacant, owner-occupied, tenant)"
+      ],
+      "signals": [
+        "bedroom",
+        "bathroom",
+        "square feet",
+        "condition",
+        "roof",
+        "hvac",
+        "repairs",
+        "vacant",
+        "occupied",
+        "tenant"
+      ]
+    },
+    {
+      "id": "timeline",
+      "name": "Timeline",
+      "weight": 10,
+      "what_good_looks_like": "Rep pins down a real date or event, not 'sometime'. Tests the timeline with a follow-up.",
+      "criteria": [
+        "Asked when the seller wants this handled",
+        "Pushed past a vague answer to a date, month, or triggering event",
+        "Connected the timeline to the seller's motivation"
+      ],
+      "signals": [
+        "timeline",
+        "how soon",
+        "when would you",
+        "by when",
+        "what's your deadline",
+        "end of the month",
+        "close by"
+      ]
+    },
+    {
+      "id": "decision_makers",
+      "name": "Decision Makers",
+      "weight": 12,
+      "what_good_looks_like": "Rep confirms everyone on title and everyone whose opinion matters, and gets them onto the next call.",
+      "criteria": [
+        "Asked who else is on title or involved in the decision",
+        "Named the other decision maker back to the seller",
+        "Proposed getting that person on the next call"
+      ],
+      "signals": [
+        "who else",
+        "on title",
+        "anyone else involved",
+        "your spouse",
+        "your sister",
+        "your brother",
+        "both of you"
+      ]
+    },
+    {
+      "id": "price",
+      "name": "Price & Offer Anchoring",
+      "weight": 15,
+      "what_good_looks_like": "Rep gets the seller to name a number first, anchors against condition and certainty, and never blurts a number before understanding motivation.",
+      "criteria": [
+        "Got the seller to say a number first",
+        "Asked how the seller arrived at that number",
+        "Framed the offer around speed, certainty, and as-is condition, not just price",
+        "Did NOT give a number in the first three minutes"
+      ],
+      "signals": [
+        "what number",
+        "what were you hoping",
+        "how did you come up with",
+        "as-is",
+        "cash",
+        "no repairs",
+        "no commissions"
+      ]
+    },
+    {
+      "id": "objections",
+      "name": "Objection Handling",
+      "weight": 8,
+      "what_good_looks_like": "Rep acknowledges the objection, asks a question back, then reframes. No arguing, no discounting the seller's number head-on.",
+      "criteria": [
+        "Acknowledged the objection before responding",
+        "Asked a clarifying question instead of arguing",
+        "Reframed around certainty, condition, or net proceeds"
+      ],
+      "signals": [
+        "i hear you",
+        "that makes sense",
+        "help me understand",
+        "fair enough",
+        "a lot of people say"
+      ]
+    },
+    {
+      "id": "next_step",
+      "name": "Clear Next Step",
+      "weight": 10,
+      "what_good_looks_like": "The call ends with a specific commitment: a day, a time, and who will be on it. 'I'll call you back sometime' does not count.",
+      "criteria": [
+        "Proposed a specific next step",
+        "Named a day and time",
+        "Confirmed the seller agreed",
+        "Confirmed best callback number or email"
+      ],
+      "signals": [
+        "does tomorrow",
+        "how about",
+        "at 2",
+        "i'll call you",
+        "let's schedule",
+        "put you down for",
+        "best number"
+      ]
+    },
+    {
+      "id": "control",
+      "name": "Call Control & Talk Ratio",
+      "weight": 5,
+      "what_good_looks_like": "Seller talks more than the rep. Rep asks more questions than they make statements, and steers the call back on track after tangents.",
+      "criteria": [
+        "Seller talk time is greater than rep talk time",
+        "Rep asked at least 8 questions",
+        "Rep steered back after a tangent"
+      ],
+      "signals": []
+    }
+  ],
+  "auto_fail": [
+    "Rep gave a specific dollar offer before asking why the seller is selling",
+    "Rep ended the call with no next step of any kind",
+    "Rep argued with or talked over the seller"
+  ]
+}

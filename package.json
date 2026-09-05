@@ -1,0 +1,23 @@
+{
+  "name": "hr-agents-sales-practice",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AI Sales Practice & Testing System - an AI seller persona calls your sales line, the call is recorded, transcribed, scored against your sales standard, and turned into a coaching report.",
+  "engines": { "node": ">=20" },
+  "bin": { "practice": "./src/cli.js" },
+  "scripts": {
+    "demo": "node src/cli.js demo",
+    "serve": "node src/cli.js serve",
+    "mine": "node src/cli.js mine",
+    "call": "node src/cli.js call",
+    "transcribe": "node src/cli.js transcribe",
+    "score": "node src/cli.js score",
+    "report": "node src/cli.js report",
+    "doctor": "node src/cli.js doctor",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
