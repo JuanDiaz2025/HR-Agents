@@ -226,3 +226,4 @@ node_modules/
 *.m4a
 recordings/
 dist/
+build/

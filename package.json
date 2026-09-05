@@ -20,9 +20,14 @@
     "report": "node src/cli.js report",
     "doctor": "node src/cli.js doctor",
     "test": "node --test test/*.test.js",
-    "snapshot": "node scripts/build-snapshot.js"
+    "snapshot": "node scripts/build-snapshot.js",
+    "build:exe": "node scripts/build-exe.js"
   },
   "dependencies": {
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "postject": "^1.0.0-alpha.6"
   }
 }

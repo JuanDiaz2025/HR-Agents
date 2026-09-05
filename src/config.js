@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { ROOT } from './resources.js';
 
-export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+export { ROOT };
 
 /** Minimal .env loader so we don't take a dependency for four lines of parsing. */
 function loadDotEnv() {

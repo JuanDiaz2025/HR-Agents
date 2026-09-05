@@ -12,6 +12,22 @@ Real calls. Real scenarios. Real coaching.
                             report.html  <-  scorecard  <-  transcript
 ```
 
+## Standalone executable
+
+`npm run build:exe` produces `dist/AI-Sales-Practice.exe` (Windows) and
+`dist/AI-Sales-Practice-linux`. Node is embedded, so the machine running it
+needs nothing installed. Double-clicked, the executable unpacks `config/`,
+`samples/` and `src/web/` beside itself, starts the server and opens a browser;
+run with arguments it behaves exactly like the CLI (`AI-Sales-Practice.exe doctor`).
+
+Two caveats. The build is not code-signed, so Windows SmartScreen warns about an
+unknown publisher. And there is no macOS build: injecting a SEA blob invalidates
+the binary's signature, and macOS requires re-signing on the machine that builds
+it - on a Mac, run from source instead.
+
+An executable removes the Node install. It does not remove the Twilio and OpenAI
+accounts, which are what actually gate a phone ringing.
+
 ## Quick start
 
 ```bash
